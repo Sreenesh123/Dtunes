@@ -280,11 +280,7 @@ const Player = () => {
           onClick={handleLikeClick}
           className="ml-4 text-white bg-transparent px-2 py-1 rounded"
         >
-          {liked? (
-            <HeartFilled color="red" />
-          ) : (
-            <HeartEmpty />
-          )}
+          {liked ? <HeartFilled color="red" /> : <HeartEmpty />}
         </button>
       </div>
       <div className="flex flex-col items-center gap-1 m-auto">
@@ -318,7 +314,6 @@ const Player = () => {
             src={assets.next_icon}
             alt=""
           />
-         
         </div>
         <div className="flex items-center gap-5">
           <p>
@@ -347,14 +342,14 @@ const Player = () => {
           </p>
         </div>
       </div>
-      <div className="flex items-center">
+      <div className="flex items-center mr-36">
         <button
           onClick={fetchLyrics}
           className="ml-4 w-10 mr-7 text-white bg-transparent px-2 py-1 rounded"
         >
           <MusicIcon />
         </button>
-        <div className="relative">
+        <div className="relative right-[5%]">
           <button
             onClick={handleAddToPlaylist}
             className="ml-4 text-white bg-transparent px-2 py-1 rounded"
@@ -362,11 +357,11 @@ const Player = () => {
             <AddToPlaylistIcon />
           </button>
           {showPlaylists && (
-            <div className="playlist-options">
+            <div className="absolute bottom-full left-0 bg-gray-800 border border-gray-700 rounded-lg p-4 shadow-lg z-10 w-48">
               <select
                 value={selectedPlaylist}
                 onChange={(e) => setSelectedPlaylist(e.target.value)}
-                className="text-black px-2 py-1 rounded"
+                className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white"
               >
                 <option value="">Select a playlist</option>
                 {playlists.map((playlist) => (
@@ -377,7 +372,7 @@ const Player = () => {
               </select>
               <button
                 onClick={() => handleAddTrackToPlaylist(trackData)}
-                className="ml-2 text-white bg-blue-500 px-2 py-1 rounded"
+                className="mt-2 w-full bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
               >
                 Add
               </button>

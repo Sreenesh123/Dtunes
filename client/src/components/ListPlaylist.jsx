@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { PlayerContext } from "../context/PlayerContext";
 import { setClientToken } from "../spotify";
 import { useNavigate } from "react-router-dom";
+import { FaHeart } from "react-icons/fa";
 
 const ListPlaylist = () => {
   const {
@@ -27,7 +28,6 @@ const ListPlaylist = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [showLikedSongs, setShowLikedSongs] = useState(false);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
-  const [reqtime, setreqtime] = useState("");
 
   useEffect(() => {
     const reqtime = time;
@@ -56,19 +56,19 @@ const ListPlaylist = () => {
     }
   }, []);
 
-const playdjsongs = async (playlist) => {
-  const tracks = playlist.tracks;
-  setSongsData(tracks);
+  const playdjsongs = async (playlist) => {
+    const tracks = playlist.tracks;
+    setSongsData(tracks);
 
-  if (tracks.length > 0) {
-    setselectedTrackData(tracks[0]);
-    setCurrentSongIndex(0);
-    console.log(tracks[0]);
-    await playWithId(tracks[0]._id, tracks); 
-  } else {
-    console.log("No tracks in the playlist");
-  }
-};
+    if (tracks.length > 0) {
+      setselectedTrackData(tracks[0]);
+      setCurrentSongIndex(0);
+      console.log(tracks[0]);
+      await playWithId(tracks[0]._id, tracks);
+    } else {
+      console.log("No tracks in the playlist");
+    }
+  };
 
   const playTrack = async (songs, song) => {
     console.log("Entered playTrack with song:", song);
@@ -106,7 +106,6 @@ const playdjsongs = async (playlist) => {
           }
         });
       } else {
-
         resolve();
       }
     });
@@ -175,19 +174,19 @@ const playdjsongs = async (playlist) => {
 
   if (isAuthenticated === null) {
     return (
-      <div className="grid place-items-center min-h-[80vh]">
-        <div className="w-16 h-16 place-self-center border-4 border-gray-400 border-t-green-800 rounded-full animate-spin"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+        <div className="w-16 h-16 border-4 border-gray-400 border-t-green-500 rounded-full animate-spin"></div>
       </div>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center text-white bg-gray-800 p-4">
-        <p className="mb-4">Please log in to access this page.</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
+        <p className="text-lg mb-4">Please log in to access this page.</p>
         <button
           onClick={() => navigate("/login")}
-          className="px-4 py-2 w-[25%] bg-white text-black rounded-full"
+          className="bg-yellow-500 text-gray-900 px-6 py-2 rounded-full hover:bg-yellow-400 transition"
         >
           Login
         </button>
@@ -196,86 +195,73 @@ const playdjsongs = async (playlist) => {
   }
 
   return (
-    <div className="p-4">
-      <p className="text-2xl font-bold mb-4">
-        {showLikedSongs ? "Liked Songs" : "Favourite Playlists..."}
+    <div className="p-4 bg-gray-900 text-white min-h-screen">
+      <p className="text-3xl font-bold mb-6">
+        {showLikedSongs ? "Liked Songs" : "Favorite Playlists"}
       </p>
-      {!showLikedSongs && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {!showLikedSongs ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <div
-            className="relative bg-gradient-to-br from-purple-700 to-blue-500 text-white p-4 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition duration-300 ease-in-out cursor-pointer"
+            className="relative bg-gradient-to-br from-purple-700 to-blue-500 text-white p-4 rounded-lg shadow-lg hover:shadow-xl transition cursor-pointer"
             onClick={handleLikedSongsClick}
           >
-            <div className="h-40 flex items-center justify-center">
-              <i className="fas fa-heart text-6xl"></i>
+            <div className="h-24 flex items-center justify-center mb-4">
+              <FaHeart className="text-5xl" />
             </div>
-            <div className="mt-2">
-              <p className="text-lg font-semibold">Liked Songs</p>
-            </div>
+            <p className="text-3xl text-center font-semibold">Liked Songs</p>
           </div>
-
-          {data.map((item, index) => (
-            <div key={item._id}>
-              <div
-                className="relative bg-gray-800 text-white p-4 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition duration-300 ease-in-out cursor-pointer"
-                onClick={() => handlePlaylistClick(item._id, item.name)}
-                style={{ transition: "transform 0.3s" }}
+          {data.map((item) => (
+            <div
+              key={item._id}
+              className="relative bg-gray-800 text-white p-3 rounded-lg shadow-lg hover:shadow-xl transition cursor-pointer"
+            >
+              <img
+                className="w-full h-32 object-cover rounded-lg mb-2"
+                src={item.image}
+                alt={item.name}
+              />
+              <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center opacity-0 hover:opacity-100 transition duration-300 ease-in-out">
+                <p className="text-center px-2">{item.desc}</p>
+              </div>
+              <p className="text-lg font-semibold">{item.name}</p>
+              <button
+                onClick={() => playdjsongs(item)}
+                className="mt-2 bg-yellow-500 text-black px-3 py-1 rounded-full hover:bg-yellow-400 transition"
               >
-                <img
-                  className="w-full h-40 object-cover rounded-lg"
-                  src={item.image}
-                  alt={item.name}
-                />
-                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 hover:opacity-100 transition duration-300 ease-in-out">
-                  <p className="text-center px-4">{item.desc}</p>
-                </div>
-                <div className="mt-2">
-                  <p className="text-lg font-semibold">{item.name}</p>
-                </div>
-              </div>
-              <div>
-                <button
-                  onClick={() => playdjsongs(item)}
-                  className="mt-2 bg-yellow-500 text-black px-4 py-2 rounded-full"
-                >
-                  DJ Mode
-                </button>
-                <button
-                  onClick={() => playSequentially(item.tracks)}
-                  className="mt-2 bg-white text-black px-4 py-2 rounded-full"
-                >
-                  Play All
-                </button>
-              </div>
+                DJ Mode
+              </button>
+              <button
+                onClick={() => playSequentially(item.tracks)}
+                className="mt-2 bg-blue-500 text-white px-3 py-1 rounded-full hover:bg-blue-400 transition"
+              >
+                Play All
+              </button>
             </div>
           ))}
         </div>
-      )}
-
-      {showLikedSongs && (
+      ) : (
         <div>
           {userlikedsongs.map((song, index) => (
             <div
-              onClick={() => {
-                playTrack([song], song);
-              }}
               key={index}
-              className="bg-gray-800 text-white p-4 rounded-lg mb-2 flex items-center"
+              onClick={() => playTrack([song], song)}
+              className="bg-gray-800 text-white p-3 rounded-lg mb-4 flex items-center cursor-pointer hover:bg-gray-700 transition"
             >
               <img
                 src={song.image.url}
                 alt={song.name}
-                className="w-16 h-16 object-cover rounded mr-4"
+                className="w-12 h-12 object-cover rounded mr-3"
               />
               <div>
                 <p className="text-lg font-semibold">{song.name}</p>
                 <p className="text-sm">{song.artist}</p>
               </div>
+              <FaHeart className="ml-auto text-red-500" />
             </div>
           ))}
           <button
             onClick={() => setShowLikedSongs(false)}
-            className="mt-4 bg-white text-black px-4 py-2 rounded-full"
+            className="mt-6 bg-gray-700 text-white px-4 py-2 rounded-full hover:bg-gray-600 transition"
           >
             Back to Playlists
           </button>
