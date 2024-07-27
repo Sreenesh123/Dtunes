@@ -42,9 +42,7 @@ const Sidebar = () => {
       </div>
       <div className="bg-[#111727] h- rounded-lg overflow-auto">
         <div className="p-4 flex items-center justify-between">
-          <div
-            className="flex items-center gap-3 cursor-pointer hover:bg-[#242424] p-2 rounded transition duration-300"
-          >
+          <div className="flex items-center gap-3 cursor-pointer hover:bg-[#242424] p-2 rounded transition duration-300">
             <FaBook className="w-8 h-8" />
             <p className="font-semibold text-lg">Library</p>
           </div>
@@ -65,6 +63,14 @@ const Sidebar = () => {
         >
           <button className="px-4 py-2 w-full bg-white text-[15px] text-black rounded-full mt-4 flex items-center gap-2 justify-center">
             Artist
+          </button>
+        </NavLink>
+        <NavLink
+          to="/listening-stats"
+          className="p-4 bg-[#242424] m-2 rounded-lg font-semibold flex flex-col items-start justify-start gap-1 pl-4 hover:bg-[#333333] transition duration-300"
+        >
+          <button className="px-4 py-2 w-full bg-white text-[15px] text-black rounded-full mt-4 flex items-center gap-2 justify-center">
+            Stats
           </button>
         </NavLink>
         <NavLink

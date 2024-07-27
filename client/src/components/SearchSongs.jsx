@@ -112,19 +112,40 @@ const SearchSongs = () => {
     handleSearch(term);
   };
 
-const handleTrackSelect = (track) => {
-  const isLiked = likedSongs.some((song) => song.uri === track.uri);
+const handleTrackSelect = async (trackData) => {
+  const isLiked = likedSongs.some((song) => song.uri === trackData.uri);
   setLiked(isLiked);
   console.log("Track selected, isLiked:", isLiked);
 
-  setSelectedTrack(track);
+  setSelectedTrack(trackData);
   setselectedTrackData({
-    ...track,
-    isLiked: isLiked, 
+    ...trackData,
+    isLiked: isLiked,
   });
 
   if (embedController) {
-    embedController.loadUri(`spotify:track:${track.id}`);
+    embedController.loadUri(`spotify:track:${trackData.id}`);
+     setSelectedTrack(trackData);
+  }
+
+  try {
+
+    const track = {
+      id: trackData.id,
+      name: trackData.name,
+      image: trackData.album.images[0]?.url || "",
+      desc: trackData.album.name,
+      artist: trackData.artists[0].name,
+    };
+
+    await axios.post("http://localhost:3000/api/song/listening-history", {
+      email,
+      track,
+      createdAt: new Date().toISOString(),
+    });
+    console.log("Listening history recorded successfully");
+  } catch (error) {
+    console.error("Error recording listening history:", error);
   }
 };
 

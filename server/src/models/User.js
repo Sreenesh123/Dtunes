@@ -36,6 +36,19 @@ const UserSchema = new mongoose.Schema({
       },
     },
   ],
+
+  listeninghistory: [
+    {
+      track: {
+        id: String,
+        name: String,
+        image: String,
+        desc: String,
+        artist: String,
+      },
+      createdAt:{type:String}
+    },
+  ],
 });
 
 const UserModel = mongoose.model("User", UserSchema);

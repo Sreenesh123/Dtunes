@@ -19,6 +19,7 @@ import Party from "./Party";
 import Home from "./Home";
 import DisplayPlaylist from "./DisplayPlaylist";
 import AlbumDetail from "./AlbumDetail";
+import ListeningStats from "./ListeningStats";
 
 const Display = () => {
   const { albumsData } = useContext(PlayerContext);
@@ -75,6 +76,10 @@ const Display = () => {
           element={<DisplayPlaylist />}
         />
         <Route path="/album/albumsongs/:id/:name" element={<AlbumDetail />} />
+        <Route
+          path="/listening-stats"
+          element={<ListeningStats email={localStorage.getItem("email")} period={30} />}
+        />
       </Routes>
     </div>
   );

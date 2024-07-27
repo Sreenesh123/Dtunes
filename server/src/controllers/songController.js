@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from "cloudinary";
 import songModel from "../models/songModel.js";
 import { User } from "../models/User.js";
+import axios from "axios"
 
 
 const addSong = async (req, res) => {
@@ -117,9 +118,11 @@ const removeSong = async (req, res) => {
   }
 };
 const addCurrentPlayingSong = async (req, res) => {
-  const { email, track } = req.body;
-  console.log("this is the required email:", email);
+  console.log("hello",req.body)
+  const { email,track,createdAt } = req.body;
+  console.log("this is the required joke email:", email);
   console.log("track:", track);
+  console.log(createdAt)
 
   try {
     const updateData = track
@@ -198,10 +201,122 @@ const fetchCurrentPlayingSong = async (req, res) => {
   }
 };
 
+const addlistenteninghistory = async (req, res) => {
+  try {
+    const { email, track,createdAt } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.listeninghistory.push({ track,createdAt });
+    await user.save();
+
+    res
+      .status(201)
+      .json({ message: "Listening history recorded successfully" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error recording listening history", error });
+  }
+};
+
+const fetchlisteninghistory=async (req, res) => {
+  try {
+    const { email } = req.params;
+    const { period } = req.query;
+    
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(period));
+
+    const recentHistory = user.listeninghistory.filter(
+      item => new Date(item.createdAt) >= startDate
+    );
+
+    const trackCounts = {};
+    for (const record of recentHistory) {
+      if (!trackCounts[record.track.id]) {
+        trackCounts[record.track.id] = {
+          track: record.track,
+          count: 0,
+        };
+      }
+      trackCounts[record.track.id].count++;
+    }
+
+    const stats = await Promise.all(
+      Object.values(trackCounts).map(async (item) => {
+        const genre = await fetchGenre(item.track.name, item.track.artist);
+        return { ...item, genre };
+      })
+    );
+
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching listening stats', error });
+  }
+};
+
+async function fetchGenre(trackName, artistName) {
+  try {
+    const response = await axios.get("https://itunes.apple.com/search", {
+      params: {
+        term: `${trackName} ${artistName}`,
+        entity: "song",
+        limit: 1,
+      },
+      
+    });
+
+    if (response.data.results.length > 0) {
+      return response.data.results[0].primaryGenreName || "Unknown";
+    } else {
+      return "Unknown";
+    }
+  } catch (error) {
+    console.error("Error fetching genre:", error);
+    return "Unknown";
+  }
+}
+
+const fetchrecommendations = async (req, res) => {
+  console.log("entered fetchrecommendations")
+  try {
+    const { trackId, limit } = req.query;
+    const recommendations = await spotifyApi.getRecommendations({
+      seed_tracks: [trackId],
+      limit: limit || 5,
+    });
+
+    const formattedRecommendations = recommendations.tracks.map((track) => ({
+      id: track.id,
+      name: track.name,
+      artist: track.artists[0].name,
+      image: track.album.images[0].url,
+      uri: track.uri,
+    }));
+
+    res.json(formattedRecommendations);
+  } catch (error) {
+    console.error("Error getting recommendations:", error);
+    res.status(500).json({ error: "Failed to get recommendations" });
+  }
+};
+
 export {
   addSong,
   listSong,
   removeSong,
   addCurrentPlayingSong,
   fetchCurrentPlayingSong,
+  addlistenteninghistory,
+  fetchlisteninghistory,
+  fetchrecommendations
 };

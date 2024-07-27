@@ -26,6 +26,7 @@ const PlayerContextProvider = (props) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [likedSongs, setLikedSongs] = useState([]);
   const [duration, setDuration] = useState(0);
+  const [spotifyIFrameAPI, setSpotifyIFrameAPI] = useState(null);
   const [time, setTime] = useState({
     currentTime: { second: 0, minute: 0 },
     totalTime: { second: 0, minute: 0 },
@@ -65,56 +66,59 @@ const PlayerContextProvider = (props) => {
     }
   };
 
- const playWithId = async (id, tracks = null) => {
-   try {
-     console.log("playing with id ", id);
+  const playWithId = async (id, tracks = null) => {
+    try {
+      console.log("playing with id ", id);
 
-     const songsToUse = tracks || songsData;
-     console.log("Songs to use:", songsToUse);
+      const songsToUse = tracks || songsData;
+      console.log("Songs to use:", songsToUse);
 
-     const track = Array.from(songsToUse).find((item) => item._id === id);
-     console.log("Track found:", track);
+      const track = Array.from(songsToUse).find((item) => item._id === id);
+      console.log("Track found:", track);
 
-     if (track) {
-       setTrack(track);
-       setselectedTrackData(track);
+      if (track) {
+        setTrack(track);
+        setselectedTrackData(track);
+        setSelectedTrack(track);
 
-       const playAudio = async (audioElement) => {
-         try {
-           if (!audioElement.paused) {
-             await audioElement.pause();
-           }
-           audioElement.src = track.preview_url
-             ? track.preview_url
-             : track.file;
-           await audioElement.load();
-           await audioElement.play();
-           setPlayStatus(true);
-         } catch (error) {
-           console.error("Error playing audio:", error);
-           setPlayStatus(false);
-         }
-       };
+        const playAudio = async (audioElement) => {
+          try {
+            if (!audioElement.paused) {
+              await audioElement.pause();
+            }
+            audioElement.src = track.preview_url
+              ? track.preview_url
+              : track.file;
+            await audioElement.load();
+            await audioElement.play();
+            setPlayStatus(true);
+          } catch (error) {
+            console.error("Error playing audio:", error);
+            setPlayStatus(false);
+          }
+        };
 
-       if (audioPlayer) {
-         await playAudio(audioPlayer);
-       } else if (audioRef.current) {
-         await playAudio(audioRef.current);
-       }
-     } else {
-       console.error("Track not found");
-     }
-   } catch (error) {
-     console.error("Error in playWithId:", error);
-   }
- };
+        if (audioPlayer) {
+          await playAudio(audioPlayer);
+        } else if (audioRef.current) {
+          await playAudio(audioRef.current);
+        }
+      } else {
+        console.error("Track not found");
+      }
+    } catch (error) {
+      console.error("Error in playWithId:", error);
+    }
+  };
 
   const next = async () => {
+    console.log(songsData)
     const currentIndex = songsData.findIndex((item) => item._id === Track._id);
     if (currentIndex < songsData.length - 1) {
       const nextTrack = songsData[currentIndex + 1];
       setTrack(nextTrack);
       setselectedTrackData(nextTrack);
+      setSelectedTrack(nextTrack);
 
       if (embedController) {
         await embedController.loadUri(nextTrack.uri);
@@ -144,6 +148,7 @@ const PlayerContextProvider = (props) => {
       const previousTrack = songsData[currentIndex - 1];
       setTrack(previousTrack);
       setselectedTrackData(previousTrack);
+      setSelectedTrack(previousTrack);
 
       if (embedController) {
         await embedController.loadUri(previousTrack.uri);
@@ -221,7 +226,8 @@ const PlayerContextProvider = (props) => {
 
   const getAlbumsData = async () => {
   };
- const getSongsData = async () => {
+
+  const getSongsData = async () => {
   };
 
   const getPlaylistTracks = async (playlistId) => {
@@ -240,6 +246,7 @@ const PlayerContextProvider = (props) => {
     setSongsData(tracks);
     setTrack(tracks[0]);
     setselectedTrackData(tracks[0]);
+    setSelectedTrack(tracks[0]);
     if (audioPlayer) {
       audioPlayer.pause();
       audioPlayer.src = tracks[0].preview_url;
@@ -261,9 +268,9 @@ const PlayerContextProvider = (props) => {
         duration = currentDuration / 1000;
       } else if (selectedTrackData && audioPlayer) {
         console.log("entered audioplayer");
-        console.log(audioPlayer.duration)
+        console.log(audioPlayer.duration);
         if (!isNaN(audioPlayer.duration)) {
-          console.log(audioPlayer.duration)
+          console.log(audioPlayer.duration);
           currentTime = audioPlayer.currentTime;
           duration = audioPlayer.duration;
           console.log("Duration:", duration, "Current Time:", currentTime);
@@ -320,57 +327,63 @@ const PlayerContextProvider = (props) => {
   }, []);
 
   useEffect(() => {
-    if (selectedTrack) {
-      const script = document.createElement("script");
-      script.src = "https://open.spotify.com/embed-podcast/iframe-api/v1";
-      script.async = true;
+    const script = document.createElement("script");
+    script.src = "https://open.spotify.com/embed-podcast/iframe-api/v1";
+    script.async = true;
+    document.body.appendChild(script);
 
-      document.body.appendChild(script);
-
-      script.onload = () => {
-        window.onSpotifyIframeApiReady = (IFrameAPI) => {
-          console.log(selectedTrack);
-          const element = document.getElementById("embed-iframe");
-          if (element) {
-            const options = {
-              width: "0%",
-              height: "0",
-              uri: selectedTrack.uri,
-            };
-            IFrameAPI.createController(element, options, (EmbedController) => {
-              setEmbedController(EmbedController);
-              EmbedController.addListener("playback_update", (e) => {
-                setCurrentTime(e.data.position);
-                setDuration(e.data.duration);
-                setTime({
-                  currentTime: {
-                    second: Math.floor((e.data.position / 1000) % 60),
-                    minute: Math.floor(e.data.position / 1000 / 60),
-                  },
-                  totalTime: {
-                    second: Math.floor((e.data.duration / 1000) % 60),
-                    minute: Math.floor(e.data.duration / 1000 / 60),
-                  },
-                });
-              });
-              EmbedController.addListener("ready", () => {
-                EmbedController.play();
-                setPlayStatus(true);
-                console.log("Embedded player ready");
-              });
-            });
-          }
-        };
+    script.onload = () => {
+      window.onSpotifyIframeApiReady = (IFrameAPI) => {
+        setSpotifyIFrameAPI(IFrameAPI);
       };
+    };
 
-      return () => {
-        if (embedController) {
-          embedController.destroy();
-        }
-        document.body.removeChild(script);
-      };
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedTrack && spotifyIFrameAPI) {
+      initializeEmbedController();
     }
-  }, [selectedTrack]);
+  }, [selectedTrack, spotifyIFrameAPI]);
+
+  const initializeEmbedController = () => {
+    const element = document.getElementById("embed-iframe");
+    if (element && spotifyIFrameAPI) {
+      if (embedController) {
+        embedController.destroy();
+      }
+      const options = {
+        width: "0%",
+        height: "0",
+        uri: selectedTrack.uri,
+      };
+      spotifyIFrameAPI.createController(element, options, (EmbedController) => {
+        setEmbedController(EmbedController);
+        EmbedController.addListener("playback_update", (e) => {
+          setCurrentTime(e.data.position);
+          setDuration(e.data.duration);
+          setTime({
+            currentTime: {
+              second: Math.floor((e.data.position / 1000) % 60),
+              minute: Math.floor(e.data.position / 1000 / 60),
+            },
+            totalTime: {
+              second: Math.floor((e.data.duration / 1000) % 60),
+              minute: Math.floor(e.data.duration / 1000 / 60),
+            },
+          });
+        });
+        EmbedController.addListener("ready", () => {
+          EmbedController.play();
+          setPlayStatus(true);
+          console.log("Embedded player ready");
+        });
+      });
+    }
+  };
 
   useEffect(() => {
     let intervalId;
