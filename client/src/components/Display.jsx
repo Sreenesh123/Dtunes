@@ -20,6 +20,7 @@ import Home from "./Home";
 import DisplayPlaylist from "./DisplayPlaylist";
 import AlbumDetail from "./AlbumDetail";
 import ListeningStats from "./ListeningStats";
+import Emptypage from "./Emptypage";
 
 const Display = () => {
   const { albumsData } = useContext(PlayerContext);
@@ -27,24 +28,24 @@ const Display = () => {
   const location = useLocation();
   const isAlbum = location.pathname.includes("album");
   const albumId = isAlbum ? location.pathname.split("/").pop() : "";
-  const bgColor =
-    isAlbum && albumsData && albumsData.length > 0
-      ? console.log(albumsData) &&
-        albumsData.find((x) => x._id == albumId).bgColor
-      : "#121212";
+  // const bgColor =
+  //   isAlbum && albumsData && albumsData.length > 0
+  //     ? console.log(albumsData) &&
+  //       albumsData.find((x) => x._id == albumId).bgColor
+  //     : "#121212";
 
-  useEffect(() => {
-    if (isAlbum) {
-      displayRef.current.style.background = `linear-gradient(${bgColor},#121212)`;
-    } else {
-      displayRef.current.style.background = "#121212";
-    }
-  }, [isAlbum, bgColor]);
+  // useEffect(() => {
+  //   if (isAlbum) {
+  //     displayRef.current.style.background = `linear-gradient(${bgColor},#121212)`;
+  //   } else {
+  //     displayRef.current.style.background = "#121212";
+  //   }
+  // }, [isAlbum, bgColor]);
 
   return (
     <div
       ref={displayRef}
-      className="w-[100%] m-2 px-6 pt-4 rounded bg-[#121212] text-white overflow-auto lg:w-[75%] lg:ml-0 "
+      className="w-[100%] m-2  pt-4 rounded-lg bg-gradient-to-b from-gray-900 to-black text-white overflow-auto lg:w-[75%] lg:ml-0 "
     >
       <Navbar />
 
@@ -75,10 +76,13 @@ const Display = () => {
           path="/playlist/display/:id/:playlistname"
           element={<DisplayPlaylist />}
         />
+        <Route path="/Search" element={<Emptypage />} />
         <Route path="/album/albumsongs/:id/:name" element={<AlbumDetail />} />
         <Route
           path="/listening-stats"
-          element={<ListeningStats email={localStorage.getItem("email")} period={30} />}
+          element={
+            <ListeningStats email={localStorage.getItem("email")} period={30} />
+          }
         />
       </Routes>
     </div>

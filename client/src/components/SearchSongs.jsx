@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import axios from "axios";
 import { PlayerContext } from "../context/PlayerContext";
 import { useLocation } from "react-router-dom";
@@ -13,7 +13,10 @@ const SearchSongs = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [friendsList, setFriendsList] = useState([]);
   const [email, setEmail] = useState(localStorage.getItem("email"));
- 
+  const [showResults, setShowResults] = useState(false);
+  const [userSavedSongs, setUserSavedSongs] = useState([]);
+
+  const searchContainerRef = useRef(null);
 
   const {
     setselectedTrackData,
@@ -25,8 +28,12 @@ const SearchSongs = () => {
     setEmbedController,
     selectedTrack,
     setSelectedTrack,
+    setSongsData,
     setLiked,
-    likedSongs, setLikedSongs
+    likedSongs,
+    setLikedSongs,
+    playWithId,
+    songsData,
   } = useContext(PlayerContext);
   const location = useLocation();
 
@@ -50,7 +57,24 @@ const SearchSongs = () => {
 
     fetchFriendsList();
     fetchLikedSongs();
+    fetchSongs();
   }, [email]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target)
+      ) {
+        setShowResults(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const fetchLikedSongs = async () => {
     try {
@@ -60,6 +84,22 @@ const SearchSongs = () => {
       setLikedSongs(response.data.likedSongs);
     } catch (error) {
       console.error("Error fetching liked songs:", error);
+    }
+  };
+
+  const fetchSongs = async () => {
+    try {
+      const response = await axios.get(
+        `http://localhost:3000/api/song/allsongs`
+      );
+      if (response.data.success) {
+        setUserSavedSongs(response.data.tracks || []);
+      } else {
+        setUserSavedSongs([]);
+      }
+    } catch (error) {
+      console.error("Error occurred while fetching songs:", error);
+      setUserSavedSongs([]);
     }
   };
 
@@ -75,7 +115,7 @@ const SearchSongs = () => {
 
     if (searchType === "songs") {
       try {
-        const response = await axios.get(
+        const spotifyResponse = await axios.get(
           `https://api.spotify.com/v1/search?q=${encodeURIComponent(
             term
           )}&type=track`,
@@ -86,7 +126,16 @@ const SearchSongs = () => {
           }
         );
 
-        setSearchResults(response.data.tracks.items);
+        const spotifyTracks = spotifyResponse.data.tracks.items;
+
+        const filteredUserSongs = userSavedSongs.filter(
+          (song) =>
+            song.name.toLowerCase().includes(term.toLowerCase())
+           
+        );
+        const combinedResults = [...spotifyTracks, ...filteredUserSongs];
+
+        setSearchResults(combinedResults);
       } catch (error) {
         console.error("Error fetching search results:", error);
         setError("Error fetching search results. Please try again.");
@@ -110,44 +159,61 @@ const SearchSongs = () => {
     const term = e.target.value;
     setSearchTerm(term);
     handleSearch(term);
+    setShowResults(true);
   };
 
-const handleTrackSelect = async (trackData) => {
-  const isLiked = likedSongs.some((song) => song.uri === trackData.uri);
-  setLiked(isLiked);
-  console.log("Track selected, isLiked:", isLiked);
-
-  setSelectedTrack(trackData);
-  setselectedTrackData({
-    ...trackData,
-    isLiked: isLiked,
-  });
-
-  if (embedController) {
-    embedController.loadUri(`spotify:track:${trackData.id}`);
+  const playTrack = (track) => {
+    console.log(track);
+    setSongsData([track]);
+    setselectedTrackData(track);
      setSelectedTrack(trackData);
-  }
+    playWithId(track._id, [track]);
+  };
 
-  try {
+  const handleTrackSelect = async (trackData) => {
+    const isUserSavedSong = !trackData.uri;
+    const isLiked = isUserSavedSong
+      ? likedSongs.some((song) => song._id === trackData._id)
+      : likedSongs.some((song) => song.uri === trackData.uri);
+    setLiked(isLiked);
+    console.log("Track selected, isLiked:", isLiked);
 
-    const track = {
-      id: trackData.id,
-      name: trackData.name,
-      image: trackData.album.images[0]?.url || "",
-      desc: trackData.album.name,
-      artist: trackData.artists[0].name,
-    };
+   
+    console.log(trackData);
 
-    await axios.post("http://localhost:3000/api/song/listening-history", {
-      email,
-      track,
-      createdAt: new Date().toISOString(),
+    setselectedTrackData({
+      ...trackData,
+      isLiked: isLiked,
     });
-    console.log("Listening history recorded successfully");
-  } catch (error) {
-    console.error("Error recording listening history:", error);
-  }
-};
+
+    if (isUserSavedSong) {
+      playTrack(trackData);
+    } else if (embedController) {
+      embedController.loadUri(`spotify:track:${trackData.id}`);
+      setSelectedTrack(trackData);
+    }
+
+    try {
+      const track = {
+        id: trackData.id,
+        name: trackData.name,
+        image: trackData.image || trackData.album?.images[0]?.url || "",
+        desc: trackData.album?.name || trackData.desc,
+        artist: trackData.artists
+          ? trackData.artists[0].name
+          : trackData.artist,
+      };
+
+      await axios.post("http://localhost:3000/api/song/listening-history", {
+        email,
+        track,
+        createdAt: new Date().toISOString(),
+      });
+      console.log("Listening history recorded successfully");
+    } catch (error) {
+      console.error("Error recording listening history:", error);
+    }
+  };
 
   const handleSendFriendRequest = async (receiverId) => {
     if (friendsList.some((friend) => friend === receiverId)) {
@@ -170,83 +236,115 @@ const handleTrackSelect = async (trackData) => {
   };
 
   return (
-    <div className="w-full p-4">
-      <div className="flex flex-row justify-evenly items-center">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={handleInputChange}
-          placeholder="Search for songs or users"
-          className="bg-gray-800 w-1/7 text-white rounded-l-md py-2 px-4 outline-none placeholder-gray-500"
-        />
-        <select
-          value={searchType}
-          onChange={(e) => setSearchType(e.target.value)}
-          className="bg-gray-800 w-40 text-white py-2 px-4 outline-none rounded-r-md"
-        >
-          <option value="songs">Songs</option>
-          <option value="users">Users</option>
-        </select>
-      </div>
-
-      {loading && <p className="mt-4 text-gray-400">Loading...</p>}
-      {error && <p className="mt-4 text-red-500">{error}</p>}
-
-      {searchType === "songs" && (
-        <div className="mt-4">
-          {searchResults.map((track) => (
-            <div
-              key={track.id}
-              className="flex items-center mb-4 bg-gray-700 rounded-md p-4 cursor-pointer"
-              onClick={() => handleTrackSelect(track)}
+    <div className="w-full pt-4 px-6 relative" ref={searchContainerRef}>
+      <div className="w-full max-w-3xl mx-auto">
+        <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+          <div className="p-4 flex items-center space-x-4">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={handleInputChange}
+              placeholder="Search for songs or users"
+              className="flex-grow bg-gray-700 text-white rounded-full py-2 px-4 outline-none placeholder-gray-400 focus:ring-2 focus:ring-blue-500 transition duration-300"
+            />
+            <select
+              value={searchType}
+              onChange={(e) => setSearchType(e.target.value)}
+              className="bg-gray-700 text-white py-2 px-4 outline-none rounded-md focus:ring-2 focus:ring-blue-500 transition duration-300"
             >
-              <img
-                src={track.album.images[2]?.url}
-                alt={track.name}
-                className="w-16 h-16 rounded mr-4"
-              />
-              <div>
-                <h3 className="text-white font-bold">{track.name}</h3>
-                <p className="text-gray-400">
-                  Artists:{" "}
-                  {track.artists.map((artist) => artist.name).join(", ")}
-                </p>
-                <p className="text-gray-400">Album: {track.album.name}</p>
-              </div>
-            </div>
-          ))}
+              <option value="songs">Songs</option>
+              <option value="users">Users</option>
+            </select>
+          </div>
         </div>
-      )}
 
-      {searchType === "users" && (
-        <div>
-          {userResults.map((user) => (
-            <div
-              key={user._id}
-              className="flex items-center mb-4 bg-gray-700 rounded-md p-4"
-            >
-              <div>
-                <h3 className="text-white font-bold">{user.username}</h3>
-                {friendsList.some((friend) => friend === user.email) ? (
-                  <button
-                    disabled
-                    className="bg-gray-500 text-white py-1 px-2 rounded-md mt-2"
-                  >
-                    Following
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleSendFriendRequest(user.email)}
-                    className="bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded-md mt-2"
-                  >
-                    Send Friend Request
-                  </button>
+        {showResults &&
+          (loading ||
+            error ||
+            searchResults.length > 0 ||
+            userResults.length > 0) && (
+            <div className="absolute left-0 right-0 mt-2 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-10">
+              {loading && (
+                <p className="text-center py-4 text-gray-400">Loading...</p>
+              )}
+              {error && (
+                <p className="text-center py-4 text-red-500 font-semibold">
+                  {error}
+                </p>
+              )}
+
+              <div className="max-h-[60vh] overflow-y-auto">
+                {searchType === "songs" && (
+                  <div className="space-y-4 p-4">
+                    {searchResults.map((track) => (
+                      <div
+                        key={track.id || track._id}
+                        className="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600 transition duration-300"
+                        onClick={() => handleTrackSelect(track)}
+                      >
+                        <img
+                          src={track.image || track.album?.images[2]?.url}
+                          alt={track.name}
+                          className="w-16 h-16 rounded-md mr-4 object-cover"
+                        />
+                        <div>
+                          <h3 className="text-white font-bold text-lg mb-1">
+                            {track.name}
+                          </h3>
+                          <p className="text-gray-400 text-sm">
+                            {track.artists
+                              ? track.artists
+                                  .map((artist) => artist.name)
+                                  .join(", ")
+                              : track.artist}
+                          </p>
+                          <p className="text-gray-500 text-xs mt-1">
+                            {track.album?.name || track.desc}
+                          </p>
+                          {track.user && (
+                            <p className="text-gray-400 text-xs mt-1">
+                              Uploaded by: {track.user.username}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {searchType === "users" && (
+                  <div className="space-y-4 p-4">
+                    {userResults.map((user) => (
+                      <div
+                        key={user._id}
+                        className="flex items-center justify-between bg-gray-700 rounded-lg p-4"
+                      >
+                        <h3 className="text-white font-bold text-lg">
+                          {user.username}
+                        </h3>
+                        {friendsList.some((friend) => friend === user.email) ? (
+                          <button
+                            disabled
+                            className="bg-gray-500 text-white py-2 px-4 rounded-md opacity-50 cursor-not-allowed"
+                          >
+                            Following
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleSendFriendRequest(user.email)}
+                            className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md transition duration-300"
+                          >
+                            Send Friend Request
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          )}
+      </div>
 
       <div id="embed-iframe" className="w-0 h-0 invisible hidden"></div>
     </div>

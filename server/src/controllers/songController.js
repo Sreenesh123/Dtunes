@@ -4,6 +4,7 @@ import { User } from "../models/User.js";
 import axios from "axios"
 
 
+
 const addSong = async (req, res) => {
   console.log("entered addsong");
   try {
@@ -16,9 +17,8 @@ const addSong = async (req, res) => {
     const imageUpload = await cloudinary.uploader.upload(imageFile.path, {
       resource_type: "image",
     });
-    const duration = `${Math.floor(audioUpload.duration / 60)}:${Math.floor(
-      audioUpload.duration % 60
-    )}`;
+    const duration = audioUpload.duration
+    ;
     const user = await User.findOne({ email });
 
     const songData = {
@@ -107,7 +107,7 @@ const removeSong = async (req, res) => {
     }
     songAlbum.tracks.splice(songIndex, 1);
     await user.save();
-    // await songModel.findByIdAndDelete(id);
+    await songModel.findByIdAndDelete(id);
     res.json({
       success: true,
       message: `Song '${songName}' removed from album '${songAlbum.name}'`,
@@ -117,6 +117,26 @@ const removeSong = async (req, res) => {
     res.json({ success: false });
   }
 };
+
+const fetchallsongs = async (req, res) => {
+  try {
+    console.log("ravi")
+    const allSongs = await songModel.find({})
+    console.log("ram",allSongs)
+    res.json({ success: true, tracks: allSongs });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error fetching songs",
+        error: error.message,
+      });
+  }
+};
+
+
+
 const addCurrentPlayingSong = async (req, res) => {
   console.log("hello",req.body)
   const { email,track,createdAt } = req.body;
@@ -318,5 +338,6 @@ export {
   fetchCurrentPlayingSong,
   addlistenteninghistory,
   fetchlisteninghistory,
-  fetchrecommendations
+  fetchrecommendations,
+  fetchallsongs
 };

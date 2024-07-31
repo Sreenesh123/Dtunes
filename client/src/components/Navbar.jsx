@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from "react";
 import { assets } from "../assets/frontend-assets/assets";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { setClientToken } from "../spotify";
 import { PlayerContext } from "../context/PlayerContext";
@@ -8,6 +8,7 @@ import SearchSongs from "./SearchSongs";
 
 const Navbar = () => {
   const navigate = useNavigate();
+  const location = useLocation(); // Get the current location
   const { email } = useContext(PlayerContext);
   const [friendRequests, setFriendRequests] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -97,7 +98,7 @@ const Navbar = () => {
 
   return (
     <>
-      <div className="w-full flex justify-between items-center font-semibold p-4 bg-gray-800 text-white">
+      <div className="w-full flex justify-between items-center font-semibold p-4 rounded-lg text-white">
         <div className="flex items-center gap-2">
           <img
             onClick={() => navigate(-1)}
@@ -112,6 +113,13 @@ const Navbar = () => {
             alt="Forward"
           />
         </div>
+
+        {location.pathname === "/Search" && (
+          <div className="w-[40%] rounded-full">
+            <SearchSongs />
+          </div>
+        )}
+
         <div className="flex items-center gap-4">
           {tokenActive ? (
             <button
@@ -177,9 +185,6 @@ const Navbar = () => {
             )}
           </div>
         </div>
-      </div>
-      <div className="flex flex-row w-full items-center">
-        <SearchSongs />
       </div>
     </>
   );

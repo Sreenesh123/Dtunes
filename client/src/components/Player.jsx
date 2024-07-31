@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useCallback } from "react";
 import { assets } from "../assets/frontend-assets/assets";
 import { PlayerContext } from "../context/PlayerContext";
 import axios from "axios";
@@ -26,6 +26,7 @@ const Player = () => {
     previous,
     seekSong,
     selectedTrackData,
+    selectedTrack,
     likedSongs,
     setLikedSongs,
   } = useContext(PlayerContext);
@@ -38,9 +39,14 @@ const Player = () => {
   const [selectedPlaylist, setSelectedPlaylist] = useState("");
   const [showPlaylists, setShowPlaylists] = useState(false);
   
+  const trackData = selectedTrackData || Track || selectedTrack;
+  console.log(trackData)
+
+  const isTrackLiked = useCallback((track) => {
+    return likedSongs.some((likedSong) => likedSong?.uri === track?.uri);
+  }, [likedSongs]);
 
   useEffect(() => {
-   
     if (token) {
       console.log("Retrieved token:", token);
       setClientToken(token);
@@ -51,15 +57,14 @@ const Player = () => {
     }
   }, [token]);
 
-  const trackData = selectedTrackData || Track;
- 
-
   useEffect(() => {
     if (trackData && email) {
-      checkIfLiked();
+      console.log(trackData)
+      const isLiked = isTrackLiked(trackData);
+      setLiked(isLiked);
       updateCurrentPlayingTrack();
     }
-  }, [trackData, email]);
+  }, [trackData, email, isTrackLiked]);
 
   useEffect(() => {
     fetchLikedSongs();
@@ -91,11 +96,6 @@ const Player = () => {
   useEffect(() => {
     fetchPlaylists(email);
   }, [email]);
-
-  const checkIfLiked = () => {
-    const isLiked = likedSongs.some((song) => song.id === trackData.id);
-    setLiked(isLiked);
-  };
 
   const updateCurrentPlayingTrack = async () => {
     try {
@@ -172,6 +172,16 @@ const Player = () => {
     clearCurrentPlayingTrack();
   };
 
+  const handlePlay = () => {
+    console.log(trackData)
+    if (trackData) {
+      console.log(trackData)
+      const isLiked = isTrackLiked(trackData);
+      setLiked(isLiked);
+    }
+    play();
+  };
+
   const handleAddTrackToPlaylist = async (newtrackData) => {
     console.log(newtrackData);
     const clickedtrackData = {
@@ -207,14 +217,19 @@ const Player = () => {
 
   const handleLikeClick = async () => {
     try {
-      if (!trackData.id) {
+      console.log("clicked like")
+      if (!trackData._id) {
         console.log("No valid track to like.");
         return;
       }
 
-      const isLiked = likedSongs.some((song) => song.uri?song.uri:"" === trackData.uri?trackData.uri:"none");
+      const isLiked = likedSongs.some((song) =>{console.log(song,trackData)
+        console.log((song.uri ? song.uri : "") === (trackData.uri ? trackData.uri : "none"));
+        return (song.uri?song.uri:"" )===( trackData.uri?trackData.uri:"none")} );
+      console.log(isLiked)
 
       if (liked) {
+        console.log("entered liking")
         const response = await axios.delete(
           `http://localhost:3000/api/like/remove/${trackData.uri}/${email}`
         );
@@ -230,17 +245,17 @@ const Player = () => {
         const likedSong = {
           id: trackData.id,
           name: trackData.name,
-          image: trackData.album.images[0],
+          image: trackData.image || trackData.album?.images[0]?.url || "",
           duration: trackData.duration_ms,
           preview_url: trackData.preview_url,
           uri: trackData.uri,
-          artist: trackData.artists ? trackData.artists[0].name : "Unknown",
+          artist: trackData.artists ? trackData.artists[0].name : trackData.artist?trackData.artist:"Unknown",
         };
         const response = await axios.post(
           `http://localhost:3000/api/like/add/${email}`,
           likedSong
         );
-
+console.log(response)
         if (response.data.success) {
           setLiked(true);
           setLikedSongs([...likedSongs, likedSong]);
@@ -300,7 +315,7 @@ const Player = () => {
             />
           ) : (
             <img
-              onClick={play}
+              onClick={handlePlay}
               className="w-4 cursor-pointer"
               src={assets.play_icon}
               alt=""
@@ -403,7 +418,7 @@ const Player = () => {
       )}
     </div>
   ) : (
-    <div className="h-[10%] bg-black flex justify-center items-center text-white">
+    <div className="h-[10%] bg-[#111727] flex justify-center items-center text-white">
       <p>Select a song to play</p>
     </div>
   );

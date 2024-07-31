@@ -11,11 +11,25 @@ const msToMinutesAndSeconds = (ms) => {
   return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
 };
 
+const msToHoursMinutesAndSeconds = (ms) => {
+  const totalSeconds = ms / 1000;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  return `${hours} hr ${minutes} min ${seconds} sec`;
+};
+
 const DisplayPlaylist = () => {
-  const { setSelectedTrack, setselectedTrackData } = useContext(PlayerContext);
+  const {
+    setSelectedTrack,
+    setselectedTrackData,
+    playlistimage,
+    setPlaylistImage,
+  } = useContext(PlayerContext);
   const { id, playlistname } = useParams();
   const [email, setEmail] = useState(localStorage.getItem("email") || "");
   const [songs, setSongs] = useState([]);
+  const [totalDuration, setTotalDuration] = useState(0);
 
   useEffect(() => {
     const fetchPlaylistTracks = async () => {
@@ -25,6 +39,11 @@ const DisplayPlaylist = () => {
         );
         if (response.data.success) {
           setSongs(response.data.tracks);
+          const total = response.data.tracks.reduce(
+            (acc, track) => acc + track.duration,
+            0
+          );
+          setTotalDuration(total);
         }
       } catch (error) {
         toast.error("Error occurred while fetching playlist tracks.");
@@ -42,7 +61,15 @@ const DisplayPlaylist = () => {
 
   return (
     <div className="p-6 bg-gray-900 min-h-screen text-white">
-      <h1 className="text-3xl font-bold mb-6 ">{playlistname}</h1>
+      <img
+        src={playlistimage}
+        alt=""
+        className="w-48 h-48 object-cover rounded-lg mb-4"
+      />
+      <h1 className="text-3xl font-bold mb-2">{playlistname}</h1>
+      <p className="text-gray-400 mb-6">
+        {songs.length} songs • {msToHoursMinutesAndSeconds(totalDuration)}
+      </p>
       <div className="overflow-x-auto">
         <div className="min-w-full bg-gray-800 rounded-lg shadow-lg">
           <div className="border-b border-gray-700">

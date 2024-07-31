@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { playlistSchema } from "./playlistModel.js";
 import { likedsongSchema } from "./likedsongModel.js";
 import { albumSchema } from "./albumModel.js";
+import { songSchema } from "./songModel.js";
 
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },

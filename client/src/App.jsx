@@ -48,7 +48,7 @@ function App() {
 
   return (
     <AnimatePresence exit>
-      <div className="h-screen bg-[#131312]">
+      <div className="h-screen bg-black">
         <Routes>
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
@@ -59,7 +59,7 @@ function App() {
 
         {showSidebarAndPlayer && (
           <>
-            <div className="h-[90%] flex">
+            <div className="h-[90%] w-full bg-black flex justify-center">
               <Sidebar />
               <Display />
             </div>

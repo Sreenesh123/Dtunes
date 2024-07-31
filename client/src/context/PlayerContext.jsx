@@ -27,6 +27,9 @@ const PlayerContextProvider = (props) => {
   const [likedSongs, setLikedSongs] = useState([]);
   const [duration, setDuration] = useState(0);
   const [spotifyIFrameAPI, setSpotifyIFrameAPI] = useState(null);
+    const [isSpotifyTrack, setIsSpotifyTrack] = useState(false);
+  const [playlistimage,setPlaylistImage]=useState("")
+  const [playMode, setPlayMode] = useState("none");
   const [time, setTime] = useState({
     currentTime: { second: 0, minute: 0 },
     totalTime: { second: 0, minute: 0 },
@@ -34,6 +37,7 @@ const PlayerContextProvider = (props) => {
 
   const play = async () => {
     try {
+
       if (embedController) {
         console.log("entered embedplay");
         await embedController.resume();
@@ -46,6 +50,35 @@ const PlayerContextProvider = (props) => {
       setPlayStatus(true);
     } catch (error) {
       console.error("Error in play:", error);
+    }
+  };
+
+   const resetSeekBarAndTime = () => {
+     setCurrentPosition(0);
+     setCurrentDuration(0);
+     setCurrentTime(0);
+     setDuration(0);
+     setTime({
+       currentTime: { second: 0, minute: 0 },
+       totalTime: { second: 0, minute: 0 },
+     });
+     if (seekBar.current) {
+       seekBar.current.style.width = "0%";
+     }
+   };
+
+  const stopAudioPlayer = () => {
+    if (audioPlayer) {
+      audioPlayer.pause();
+      audioPlayer.currentTime = 0;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    if (embedController) {
+      embedController.pause()
+      embedController.destroy();
     }
   };
 
@@ -69,6 +102,14 @@ const PlayerContextProvider = (props) => {
   const playWithId = async (id, tracks = null) => {
     try {
       console.log("playing with id ", id);
+      console.log(songsData)
+      console.log(tracks)
+      stopAudioPlayer()
+      if(embedController)   
+        {embedController.destroy(), 
+          setEmbedController(null);
+        } 
+      
 
       const songsToUse = tracks || songsData;
       console.log("Songs to use:", songsToUse);
@@ -79,7 +120,9 @@ const PlayerContextProvider = (props) => {
       if (track) {
         setTrack(track);
         setselectedTrackData(track);
-        setSelectedTrack(track);
+        
+        // setSelectedTrack(track);
+
 
         const playAudio = async (audioElement) => {
           try {
@@ -118,7 +161,8 @@ const PlayerContextProvider = (props) => {
       const nextTrack = songsData[currentIndex + 1];
       setTrack(nextTrack);
       setselectedTrackData(nextTrack);
-      setSelectedTrack(nextTrack);
+      if(playMode!=="dj"){
+      setSelectedTrack(nextTrack);}
 
       if (embedController) {
         await embedController.loadUri(nextTrack.uri);
@@ -148,8 +192,9 @@ const PlayerContextProvider = (props) => {
       const previousTrack = songsData[currentIndex - 1];
       setTrack(previousTrack);
       setselectedTrackData(previousTrack);
-      setSelectedTrack(previousTrack);
-
+       if (playMode !== "dj") {
+         setSelectedTrack(previousTrack);
+       }
       if (embedController) {
         await embedController.loadUri(previousTrack.uri);
       } else if (audioPlayer) {
@@ -268,16 +313,20 @@ const PlayerContextProvider = (props) => {
         duration = currentDuration / 1000;
       } else if (selectedTrackData && audioPlayer) {
         console.log("entered audioplayer");
+        console.log(Object.keys(audioPlayer),audioPlayer,typeof audioPlayer)
         console.log(audioPlayer.duration);
-        if (!isNaN(audioPlayer.duration)) {
-          console.log(audioPlayer.duration);
-          currentTime = audioPlayer.currentTime;
-          duration = audioPlayer.duration;
-          console.log("Duration:", duration, "Current Time:", currentTime);
-        } else {
-          console.log("Audio player duration is not available yet");
-          return;
-        }
+        console.log(selectedTrackData.duration)
+       
+          if (!isNaN(audioPlayer.duration)) {
+            console.log(audioPlayer.duration);
+            console.log(audioPlayer.currentTime)
+            currentTime = audioPlayer.currentTime;
+            duration = audioPlayer.duration;
+            console.log("Duration:", duration, "Current Time:", currentTime);
+          } else {
+            console.log("Audio player duration is not available yet");
+            return;
+          }
       } else if (audioRef.current) {
         if (!isNaN(audioRef.current.duration)) {
           currentTime = audioRef.current.currentTime;
@@ -290,6 +339,7 @@ const PlayerContextProvider = (props) => {
 
       if (duration > 0) {
         const widthPercentage = (currentTime / duration) * 100;
+        console.log(currentTime,duration)
         console.log("Width Percentage:", widthPercentage);
         seekBar.current.style.width = `${widthPercentage}%`;
         setTime({
@@ -344,6 +394,7 @@ const PlayerContextProvider = (props) => {
   }, []);
 
   useEffect(() => {
+    console.log(selectedTrack,spotifyIFrameAPI)
     if (selectedTrack && spotifyIFrameAPI) {
       initializeEmbedController();
     }
@@ -351,7 +402,9 @@ const PlayerContextProvider = (props) => {
 
   const initializeEmbedController = () => {
     const element = document.getElementById("embed-iframe");
+    console.log(element)
     if (element && spotifyIFrameAPI) {
+      stopAudioPlayer()
       if (embedController) {
         embedController.destroy();
       }
@@ -389,11 +442,13 @@ const PlayerContextProvider = (props) => {
     let intervalId;
 
     if (embedController) {
+      console.log("entering embed")
       embedController.addListener("playback_update", (e) => {
         setCurrentPosition(e.data.position);
         setCurrentDuration(e.data.duration);
       });
     } else {
+      console.log("setting interval")
       intervalId = setInterval(updateSeekBar, 1000);
     }
 
@@ -479,6 +534,7 @@ const PlayerContextProvider = (props) => {
     setSelectedTrack,
     duration,
     setDuration,
+    playlistimage,setPlaylistImage,playMode,setPlayMode
   };
 
   return (

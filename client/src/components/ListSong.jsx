@@ -13,21 +13,7 @@ const ListSong = () => {
   useEffect(() => {
     const fetchUserEmail = async () => {
       const token = localStorage.getItem("token");
-
-      if (token) {
-        console.log("Retrieved token:", token);
-        setClientToken(token);
-
-        try {
-          const response = await apiClient.get("me");
-          console.log(response);
-          setEmail(response.data.email);
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-        }
-      } else {
-        console.error("No token found.");
-      }
+      setEmail(localStorage.getItem("email"))
     };
 
     fetchUserEmail();

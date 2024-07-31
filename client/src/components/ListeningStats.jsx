@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef, useCallback } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import axios from "axios";
 import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
@@ -20,21 +20,7 @@ const ListeningStats = ({ email, period }) => {
   const [genreStats, setGenreStats] = useState({});
   const [artistStats, setArtistStats] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-
-  const observer = useRef();
-  const lastRecommendationElementRef = useCallback(node => {
-    if (loading) return;
-    if (observer.current) observer.current.disconnect();
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
-        loadMoreRecommendations();
-      }
-    });
-    if (node) observer.current.observe(node);
-  }, [loading, hasMore]);
 
   useEffect(() => {
     fetchListeningStats();
@@ -95,27 +81,26 @@ const ListeningStats = ({ email, period }) => {
 
       if (topTrack && topArtists.length > 0) {
         const artistResponses = await Promise.all(
-          topArtists.map(artist => 
-            apiClient.get('search', {
+          topArtists.map((artist) =>
+            apiClient.get("search", {
               params: {
                 q: artist,
-                type: 'artist',
-                limit: 1
-              }
+                type: "artist",
+                limit: 1,
+              },
             })
           )
         );
         const artistIds = artistResponses
-          .map(response => response.data.artists.items[0]?.id)
-          .filter(id => id);
+          .map((response) => response.data.artists.items[0]?.id)
+          .filter((id) => id);
 
-        const response = await apiClient.get('recommendations', {
+        const response = await apiClient.get("recommendations", {
           params: {
             seed_tracks: topTrack.id,
-            seed_artists: artistIds.join(','),
-            limit: 20,
-            offset: (page - 1) * 20
-          }
+            seed_artists: artistIds.join(","),
+            limit: 10,
+          },
         });
         const newRecommendations = response.data.tracks.map((track) => ({
           _id: track.id,
@@ -124,11 +109,8 @@ const ListeningStats = ({ email, period }) => {
           image: track.album.images[0].url,
           uri: track.uri,
         }));
-        setRecommendations(prev => [...prev, ...newRecommendations]);
-        setSongsData((prev) => [...prev, ...newRecommendations]);
-        
-        setHasMore(newRecommendations.length > 0);
-        setPage(prev => prev + 1);
+        setRecommendations(newRecommendations);
+        setSongsData(newRecommendations);
       }
     } catch (error) {
       console.error("Error fetching recommendations:", error);
@@ -137,18 +119,21 @@ const ListeningStats = ({ email, period }) => {
     }
   };
 
-  const loadMoreRecommendations = () => {
-    fetchRecommendations();
-  };
-
-  const playRecommendation = (track) => {
+  const playRecommendation = (track, index) => {
+    console.log(track)
     setSelectedTrack(track);
-    setselectedTrackData(track)
-    
-    setTrack(track)
+    // setselectedTrackData(track);
+    setTrack(track);
 
     if (embedController) {
       embedController.loadUri(track.uri);
+
+      embedController.addListener("playback_update", ({ data }) => {
+        if (data.position === data.duration) {
+          const nextIndex = (index + 1) % recommendations.length;
+          playRecommendation(recommendations[nextIndex], nextIndex);
+        }
+      });
     }
   };
 
@@ -158,11 +143,14 @@ const ListeningStats = ({ email, period }) => {
       {
         data: Object.values(genreStats),
         backgroundColor: [
-          "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40",
+          "#FF6384",
+          "#36A2EB",
+          "#FFCE56",
+          "#4BC0C0",
+          "#9966FF",
+          "#FF9F40",
         ],
-        hoverBackgroundColor: [
-          "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40",
-        ],
+    
       },
     ],
   };
@@ -179,7 +167,7 @@ const ListeningStats = ({ email, period }) => {
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg shadow-md p-6">
+    <div className=" bg-gradient-to-b from-gray-900 to-black rounded-lg shadow-md p-6">
       <h2 className="text-2xl font-bold mb-6 text-gray-100">Listening Stats</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div>
@@ -243,18 +231,13 @@ const ListeningStats = ({ email, period }) => {
         <ul className="space-y-4">
           {recommendations.map((track, index) => (
             <li
-              key={track._id}
-              ref={
-                index === recommendations.length - 1
-                  ? lastRecommendationElementRef
-                  : null
-              }
+              key={`${track._id}-${index}`}
               className={`flex items-center bg-gray-700 rounded-lg p-3 transition duration-300 hover:bg-gray-600 cursor-pointer ${
                 track.uri === selectedTrack?.uri
                   ? "border-2 border-green-500"
                   : ""
               }`}
-              onClick={() => playRecommendation(track)}
+              onClick={() => playRecommendation(track, index)}
             >
               <img
                 src={track.image}
@@ -275,25 +258,13 @@ const ListeningStats = ({ email, period }) => {
         </ul>
         {loading && (
           <p className="text-center mt-4 text-gray-300">
-            Loading more recommendations...
-          </p>
-        )}
-        {!hasMore && (
-          <p className="text-center mt-4 text-gray-300">
-            No more recommendations available
+            Loading recommendations...
           </p>
         )}
       </div>
+      <div id="embed-iframe" className="w-0 h-0 invisible hidden"></div>
     </div>
   );
 };
 
 export default ListeningStats;
-
-
-
-
-
-
-
-     

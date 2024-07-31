@@ -1,4 +1,4 @@
-import{addSong,listSong,removeSong,addCurrentPlayingSong,fetchCurrentPlayingSong, addlistenteninghistory, fetchlisteninghistory, fetchrecommendations} from "../controllers/songController.js"
+import{addSong,listSong,removeSong,addCurrentPlayingSong,fetchCurrentPlayingSong, addlistenteninghistory, fetchlisteninghistory, fetchrecommendations, fetchallsongs} from "../controllers/songController.js"
 import express from 'express'
 import upload from "../middlewares/multer.js";
  const songRouter =express.Router()
@@ -11,6 +11,7 @@ songRouter.get("/friendsCurrentTracks/:email", fetchCurrentPlayingSong);
 songRouter.post("/listening-history",addlistenteninghistory );
 songRouter.get("/listening-stats/:email",fetchlisteninghistory );
 songRouter.get("/recommendations",fetchrecommendations );
+songRouter.get("/allsongs",fetchallsongs);
 
 
 

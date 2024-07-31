@@ -2,33 +2,27 @@ import React, { useState, useEffect, useContext } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 import { PlayerContext } from "../context/PlayerContext";
+import { FaSadTear } from "react-icons/fa"; // Import the sad face icon
 
 const AlbumDetail = () => {
   const { id, name } = useParams();
   const [tracks, setTracks] = useState([]);
   const email = localStorage.getItem("email");
-  const {
-    songsData,
-    setSongsData,
-    playWithId,
-    time,
-    setTime,
-    selectedTrackData,
-    setselectedTrackData,
-  } = useContext(PlayerContext);
+  const { songsData, setSongsData, playWithId, setselectedTrackData } =
+    useContext(PlayerContext);
 
   const playTrack = (track) => {
     console.log(track);
     setSongsData([track]);
-    setselectedTrackData(track)
-
+    setselectedTrackData(track);
+    playWithId(track._id,[track]);
   };
 
-  useEffect(() => {
-    if (songsData.length > 0) {
-      playWithId(songsData[0]._id);
-    }
-  }, [songsData]);
+  // useEffect(() => {
+  //   if (songsData.length > 0) {
+  //     playWithId(songsData[0]._id);
+  //   }
+  // }, [songsData, playWithId]);
 
   useEffect(() => {
     const fetchTracks = async () => {
@@ -50,7 +44,14 @@ const AlbumDetail = () => {
     fetchTracks();
   }, [id, email]);
 
-  if (tracks.length === 0) return <div>Loading...</div>;
+  if (tracks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-gray-200 bg-gray-900">
+        <FaSadTear className="text-6xl mb-4 text-blue-500" />
+        <h1 className="text-2xl font-bold">Oops, no tracks found...</h1>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-gray-900 min-h-screen text-gray-200">

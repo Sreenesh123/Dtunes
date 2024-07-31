@@ -1,10 +1,17 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useRef,
+  useCallback,
+} from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { PlayerContext } from "../context/PlayerContext";
 import { setClientToken } from "../spotify";
 import { useNavigate } from "react-router-dom";
-import { FaHeart } from "react-icons/fa";
+import { FaHeart, FaPlay, FaRandom } from "react-icons/fa";
+import SearchSongs from "./SearchSongs";
 
 const ListPlaylist = () => {
   const {
@@ -20,6 +27,8 @@ const ListPlaylist = () => {
     Track,
     setTrack,
     playWithId,
+    playlistimage,
+    setPlaylistImage,playMode,setPlayMode
   } = useContext(PlayerContext);
 
   const [email, setEmail] = useState(localStorage.getItem("email") || "");
@@ -28,20 +37,9 @@ const ListPlaylist = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [showLikedSongs, setShowLikedSongs] = useState(false);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
+  
 
-  useEffect(() => {
-    const reqtime = time;
-    if (
-      reqtime.currentTime.minute * 60 + reqtime.currentTime.second >=
-        reqtime.totalTime.minute * 60 + reqtime.totalTime.second &&
-      reqtime.currentTime.minute * 60 + reqtime.currentTime.second > 0 &&
-      reqtime.totalTime.minute * 60 + reqtime.totalTime.second > 0
-    ) {
-      console.log("Song finished, moving to next");
-      playSequentially(songsData, currentSongIndex + 1);
-    }
-  }, [time]);
-
+  const lastProcessedTimeRef = useRef({ minute: 0, second: 0 });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -56,80 +54,149 @@ const ListPlaylist = () => {
     }
   }, []);
 
-  const playdjsongs = async (playlist) => {
-    const tracks = playlist.tracks;
-    setSongsData(tracks);
-
-    if (tracks.length > 0) {
-      setselectedTrackData(tracks[0]);
-      setCurrentSongIndex(0);
-      console.log(tracks[0]);
-      await playWithId(tracks[0]._id, tracks);
-    } else {
-      console.log("No tracks in the playlist");
-    }
-  };
-
-  const playTrack = async (songs, song) => {
-    console.log("Entered playTrack with song:", song);
-    setTrack(song);
-
-    const isLiked = likedSongs.some(
-      (track) => (track.uri ? track.uri : "") === (song.uri ? song.uri : "none")
-    );
-    setLiked(isLiked);
-    console.log("Track selected, isLiked:", isLiked);
-
-    setSelectedTrack(song);
-    setselectedTrackData({
-      ...song,
-      isLiked: isLiked,
-    });
-
+  const stopCurrentPlayback = useCallback(async () => {
     if (embedController) {
-      console.log("Loading URI in embed controller:", song.uri);
-      await embedController.loadUri(song.uri);
-      console.log("URI loaded, attempting to play");
-      await embedController.play();
-    } else {
-      console.log("No embed controller available, using playWithId");
-      await playWithId(song._id);
+      await embedController.pause();
     }
+    setTrack(null);
+    setSelectedTrack(null);
+    setselectedTrackData(null);
+  }, [embedController, setTrack, setSelectedTrack, setselectedTrackData]);
 
-    return new Promise((resolve) => {
-      if (embedController) {
-        embedController.addListener("playback_update", (e) => {
-          console.log("Playback update:", e.data.position, e.data.duration);
-          if (e.data.position >= e.data.duration) {
-            console.log("Song finished, resolving promise");
-            resolve();
-          }
-        });
-      } else {
-        resolve();
+  const playdjsongs = useCallback(
+    async (playlist) => {
+      if (playMode !== "dj") {
+        await stopCurrentPlayback();
+        setPlayMode("dj");
       }
-    });
-  };
 
-  const playSequentially = async (songs, startIndex = 0) => {
-    setSongsData(songs);
-    console.log("Starting playback with songs:", songs);
+      const tracks = playlist.tracks;
+      setSongsData(tracks);
 
-    if (startIndex >= songs.length) {
-      console.log("Reached end of playlist");
-      return;
+      if (tracks.length > 0) {
+        setselectedTrackData(tracks[0]);
+        setCurrentSongIndex(0);
+        console.log(tracks[0]);
+        await playWithId(tracks[0]._id, tracks);
+      } else {
+        console.log("No tracks in the playlist");
+      }
+    },
+    [
+      setSongsData,
+      setselectedTrackData,
+      setCurrentSongIndex,
+      playWithId,
+      playMode,
+      stopCurrentPlayback,
+    ]
+  );
+
+  const playTrack = useCallback(
+    async (songs, song) => {
+      console.log("Entered playTrack with song:", song);
+      setTrack(song);
+
+      const isLiked = likedSongs.some(
+        (track) =>
+          (track.uri ? track.uri : "") === (song.uri ? song.uri : "none")
+      );
+      setLiked(isLiked);
+      console.log("Track selected, isLiked:", isLiked);
+      console.log(song);
+
+      setSelectedTrack(song);
+      setselectedTrackData({
+        ...song,
+        isLiked: isLiked,
+      });
+
+      if (embedController) {
+        console.log("Loading URI in embed controller:", song.uri);
+        await embedController.loadUri(song.uri);
+        console.log("URI loaded, attempting to play");
+        await embedController.play();
+      }
+
+      return new Promise((resolve) => {
+        if (embedController) {
+          embedController.addListener("playback_update", (e) => {
+            console.log("Playback update:", e.data.position, e.data.duration);
+            if (e.data.position >= e.data.duration) {
+              console.log("Song finished, resolving promise");
+              resolve();
+            }
+          });
+        } else {
+          resolve();
+        }
+      });
+    },
+    [
+      setTrack,
+      likedSongs,
+      setLiked,
+      setSelectedTrack,
+      setselectedTrackData,
+      embedController,
+    ]
+  );
+
+  const playSequentially = useCallback(
+    async (songs, startIndex = 0) => {
+      if (playMode !== "playall") {
+        await stopCurrentPlayback();
+        setPlayMode("playall");
+      }
+
+      setSongsData(songs);
+      console.log("Starting playback with songs:", songs);
+
+      if (startIndex >= songs.length) {
+        console.log("Reached end of playlist");
+        return;
+      }
+
+      const song = songs[startIndex];
+      console.log(`Playing song at index ${startIndex}:`, song);
+
+      try {
+        await playTrack(songs, song);
+        setCurrentSongIndex(startIndex);
+      } catch (error) {
+        console.error("Error playing track:", error);
+      }
+    },
+    [
+      setSongsData,
+      playTrack,
+      setCurrentSongIndex,
+      playMode,
+      stopCurrentPlayback,
+    ]
+  );
+
+  useEffect(() => {
+    const reqtime = time;
+    const currentTotalSeconds =
+      reqtime.currentTime.minute * 60 + reqtime.currentTime.second;
+    const totalSeconds =
+      reqtime.totalTime.minute * 60 + reqtime.totalTime.second;
+    const lastProcessedTotalSeconds =
+      lastProcessedTimeRef.current.minute * 60 +
+      lastProcessedTimeRef.current.second;
+
+    if (
+      currentTotalSeconds >= totalSeconds &&
+      currentTotalSeconds > 0 &&
+      totalSeconds > 0 &&
+      currentTotalSeconds !== lastProcessedTotalSeconds
+    ) {
+      console.log("Song finished, moving to next");
+      lastProcessedTimeRef.current = reqtime.currentTime;
+      playSequentially(songsData, currentSongIndex + 1);
     }
-
-    const song = songs[startIndex];
-    console.log(`Playing song at index ${startIndex}:`, song);
-
-    try {
-      await playTrack(songs, song);
-      setCurrentSongIndex(startIndex);
-    } catch (error) {
-      console.error("Error playing track:", error);
-    }
-  };
+  }, [time, songsData, currentSongIndex, playSequentially]);
 
   const fetchPlaylists = async () => {
     try {
@@ -164,13 +231,17 @@ const ListPlaylist = () => {
     fetchLikedSongs();
   }, [email]);
 
-  const handlePlaylistClick = (playlistId, playlistname) => {
-    navigate(`/playlist/display/${playlistId}/${playlistname}`);
-  };
+  const handlePlaylistClick = useCallback(
+    (playlistId, playlistname, playlistimage) => {
+      setPlaylistImage(playlistimage);
+      navigate(`/playlist/display/${playlistId}/${playlistname}`);
+    },
+    [setPlaylistImage, navigate]
+  );
 
-  const handleLikedSongsClick = () => {
+  const handleLikedSongsClick = useCallback(() => {
     setShowLikedSongs(true);
-  };
+  }, []);
 
   if (isAuthenticated === null) {
     return (
@@ -195,47 +266,71 @@ const ListPlaylist = () => {
   }
 
   return (
-    <div className="p-4 bg-gray-900 text-white min-h-screen">
-      <p className="text-3xl font-bold mb-6">
-        {showLikedSongs ? "Liked Songs" : "Favorite Playlists"}
-      </p>
+    <div className="p-4 bg-gradient-to-b from-gray-900 to-black text-white min-h-screen">
+      <div className="invisible">
+        <SearchSongs />
+      </div>
+      <h1 className="text-3xl font-bold mb-6">
+        {showLikedSongs ? "Liked Songs" : "Your Playlists"}
+      </h1>
       {!showLikedSongs ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           <div
-            className="relative bg-gradient-to-br from-purple-700 to-blue-500 text-white p-4 rounded-lg shadow-lg hover:shadow-xl transition cursor-pointer"
+            className="relative bg-gradient-to-br from-purple-700 to-blue-500 text-white p-4 rounded-lg shadow-lg cursor-pointer group"
             onClick={handleLikedSongsClick}
           >
-            <div className="h-24 flex items-center justify-center mb-4">
-              <FaHeart className="text-5xl" />
+            <div className="h-40 flex items-center justify-center mb-4">
+              <FaHeart className="text-6xl" />
             </div>
-            <p className="text-3xl text-center font-semibold">Liked Songs</p>
+            <p className="text-lg font-semibold">Liked Songs</p>
+            <div className="absolute bottom-4 right-4 bg-green-500 rounded-full p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <FaPlay className="text-white" />
+            </div>
           </div>
           {data.map((item) => (
             <div
               key={item._id}
-              className="relative bg-gray-800 text-white p-3 rounded-lg shadow-lg hover:shadow-xl transition cursor-pointer"
+              className="relative bg-gray-800 hover:bg-gray-700 text-white p-4 rounded-lg shadow-lg cursor-pointer group"
+              onClick={() =>
+                handlePlaylistClick(item._id, item.name, item.image)
+              }
             >
               <img
-                className="w-full h-32 object-cover rounded-lg mb-2"
+                className="w-full h-40 object-cover rounded-lg mb-4"
                 src={item.image}
                 alt={item.name}
               />
-              <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center opacity-0 hover:opacity-100 transition duration-300 ease-in-out">
-                <p className="text-center px-2">{item.desc}</p>
+              <p className="text-lg font-semibold truncate">{item.name}</p>
+              <p className="text-sm text-gray-400 mt-1">
+                {item.tracks.length} tracks
+              </p>
+              <div className="absolute bottom-4 right-4 bg-green-500 rounded-full p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <FaPlay className="text-white" />
               </div>
-              <p className="text-lg font-semibold">{item.name}</p>
-              <button
-                onClick={() => playdjsongs(item)}
-                className="mt-2 bg-yellow-500 text-black px-3 py-1 rounded-full hover:bg-yellow-400 transition"
-              >
-                DJ Mode
-              </button>
-              <button
-                onClick={() => playSequentially(item.tracks)}
-                className="mt-2 bg-blue-500 text-white px-3 py-1 rounded-full hover:bg-blue-400 transition"
-              >
-                Play All
-              </button>
+              <div className="absolute top-2 right-2 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    playdjsongs(item);
+                  }}
+                  className={`bg-black bg-opacity-50 p-2 rounded-full hover:bg-opacity-75 transition-all duration-300 ${
+                    playMode === "dj" ? "ring-2 ring-green-500" : ""
+                  }`}
+                >
+                  <FaRandom className="text-white" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    playSequentially(item.tracks);
+                  }}
+                  className={`bg-black bg-opacity-50 p-2 rounded-full hover:bg-opacity-75 transition-all duration-300 ${
+                    playMode === "playall" ? "ring-2 ring-green-500" : ""
+                  }`}
+                >
+                  <FaPlay className="text-white" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -245,7 +340,7 @@ const ListPlaylist = () => {
             <div
               key={index}
               onClick={() => playTrack([song], song)}
-              className="bg-gray-800 text-white p-3 rounded-lg mb-4 flex items-center cursor-pointer hover:bg-gray-700 transition"
+              className="bg-gray-800 text-white p-3 rounded-lg mb-4 flex items-center cursor-pointer hover:bg-gray-700 transition-transform transform hover:-translate-y-1"
             >
               <img
                 src={song.image.url}
@@ -261,12 +356,13 @@ const ListPlaylist = () => {
           ))}
           <button
             onClick={() => setShowLikedSongs(false)}
-            className="mt-6 bg-gray-700 text-white px-4 py-2 rounded-full hover:bg-gray-600 transition"
+            className="bg-yellow-500 text-black px-4 py-2 rounded-full mt-4 hover:bg-yellow-400 transition"
           >
             Back to Playlists
           </button>
         </div>
       )}
+      <div id="embed-iframe" className="w-0 h-0 invisible hidden"></div>
     </div>
   );
 };

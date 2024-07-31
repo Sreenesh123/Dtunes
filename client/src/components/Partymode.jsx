@@ -97,7 +97,7 @@ const PartyMode = () => {
   }
 
   return (
-    <div className="w-full p-4">
+    <div className=" w-full p-4">
       <div className="flex flex-col items-center mb-4">
         <input
           type="text"

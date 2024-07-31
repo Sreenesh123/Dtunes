@@ -4,6 +4,7 @@ import { url } from "../App";
 import { toast } from "react-toastify";
 import axios from "axios";
 import { setClientToken } from "../spotify";
+import { FaUpload } from "react-icons/fa";
 
 const AddAlbum = () => {
   const [image, setImage] = useState(null);
@@ -64,61 +65,65 @@ const AddAlbum = () => {
   }, []);
 
   return loading ? (
-    <div className="grid place-items-center min-h-[80vh]">
-      <div className="w-16 h-16 place-self-center border-4 border-gray-400 border-t-green-800 rounded-full animate-spin"></div>
+    <div className="grid place-items-center min-h-[80vh] bg-gray-900">
+      <div className="w-16 h-16 border-4 border-gray-600 border-t-green-500 rounded-full animate-spin"></div>
     </div>
   ) : (
-    <form
-      onSubmit={onSubmitHandler}
-      className="flex flex-col items-start gap-8 text-gray-600"
-    >
-      <div className="flex flex-col gap-4">
-        <p>Upload Image</p>
-        <input
-          onChange={(e) => setImage(e.target.files[0])}
-          type="file"
-          id="image"
-          accept="image/*"
-          hidden
-        />
-        <label htmlFor="image">
-          <img
-            className="w-24 cursor-pointer"
-            src={image ? URL.createObjectURL(image) : assets.upload_area}
-            alt=""
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-8 animate-fadeIn">
+      <form onSubmit={onSubmitHandler} className="max-w-2xl space-y-8">
+        <div className="space-y-4 animate-slideInUp">
+          <p className="text-xl font-semibold">Upload Image</p>
+          <input
+            onChange={(e) => setImage(e.target.files[0])}
+            type="file"
+            id="image"
+            accept="image/*"
+            hidden
           />
-        </label>
-      </div>
+          <label htmlFor="image" className="cursor-pointer block">
+            <div className="w-32 h-32 bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden transition duration-300 transform hover:scale-105">
+              {image ? (
+                <img
+                  className="w-full h-full object-cover"
+                  src={URL.createObjectURL(image)}
+                  alt="Album cover"
+                />
+              ) : (
+                <FaUpload className="text-4xl text-gray-400" />
+              )}
+            </div>
+          </label>
+        </div>
 
-      <div className="flex flex-col gap-2.5">
-        <p>Album name</p>
-        <input
-          onChange={(e) => setName(e.target.value)}
-          value={name}
-          className="bg-transparent outline-green-600 border-2 border-gray-400 p-2.5 w-[max(40vw,250px)]"
-          type="text"
-          placeholder="Type Here"
-        />
-      </div>
+        <div className="space-y-2 animate-slideInUp">
+          <p className="text-xl font-semibold">Album Name</p>
+          <input
+            onChange={(e) => setName(e.target.value)}
+            value={name}
+            className="w-full bg-gray-800 border-2 border-gray-700 rounded-lg p-3 focus:outline-none focus:border-green-500 transition duration-300"
+            type="text"
+            placeholder="Enter album name"
+          />
+        </div>
 
-      <div className="flex flex-col gap-2.5">
-        <p>Album Description</p>
-        <input
-          onChange={(e) => setDesc(e.target.value)}
-          value={desc}
-          className="bg-transparent outline-green-600 border-2 border-gray-400 p-2.5 w-[max(40vw,250px)]"
-          type="text"
-          placeholder="Type Here"
-        />
-      </div>
+        <div className="space-y-2 animate-slideInUp">
+          <p className="text-xl font-semibold">Album Description</p>
+          <textarea
+            onChange={(e) => setDesc(e.target.value)}
+            value={desc}
+            className="w-full bg-gray-800 border-2 border-gray-700 rounded-lg p-3 focus:outline-none focus:border-green-500 transition duration-300 h-24 resize-none"
+            placeholder="Describe your album"
+          ></textarea>
+        </div>
 
-      <button
-        className="text-base bg-black text-white py-2.5 px-14 cursor-pointer"
-        type="submit"
-      >
-        ADD
-      </button>
-    </form>
+        <button
+          className="w-full bg-green-600 text-white py-3 px-6 rounded-lg text-lg font-semibold shadow-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 active:scale-95 animate-slideInUp"
+          type="submit"
+        >
+          Add Album
+        </button>
+      </form>
+    </div>
   );
 };
 
