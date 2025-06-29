@@ -89,6 +89,8 @@ const Navbar = () => {
     try {
       await axios.get("http://localhost:3000/auth/logout");
       localStorage.removeItem("dauthtoken");
+      localStorage.removeItem("token")
+      localStorage.removeItem("dauth_state");
       setTokenActive(false);
       navigate("/login");
     } catch (error) {
@@ -115,7 +117,7 @@ const Navbar = () => {
         </div>
 
         {location.pathname === "/Search" && (
-          <div className="w-[40%] rounded-full">
+          <div className="w-[80%] rounded-full">
             <SearchSongs />
           </div>
         )}

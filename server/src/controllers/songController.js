@@ -50,7 +50,7 @@ const addSong = async (req, res) => {
 const listSong = async (req, res) => {
   console.log("listing song");
   const { email } = req.params;
-  console.log("email::::::::::::::::::::::::::", email);
+  console.log("email", email);
   try {
     const user = await User.findOne({ email });
     if (user) {
@@ -188,7 +188,7 @@ const fetchCurrentPlayingSong = async (req, res) => {
         username: friend.username,
         currentPlayingTrack: friend.currentPlayingTrack,
       }));
-      res.status(200).json({ success: true, friendsCurrentTracks });
+      res.status(200).json({ scucess: true, friendsCurrentTracks });
     } else {
       res.status(404).json({ success: false, error: "User not found." });
     }

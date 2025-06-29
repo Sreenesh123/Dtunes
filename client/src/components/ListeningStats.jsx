@@ -1,10 +1,10 @@
+
 import React, { useState, useEffect, useContext } from "react";
 import axios from "axios";
 import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { PlayerContext } from "../context/PlayerContext";
 import apiClient from "../spotify";
-
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -19,14 +19,12 @@ const ListeningStats = ({ period }) => {
     setLoading,
     email,
   } = useContext(PlayerContext);
- 
 
   const [stats, setStats] = useState([]);
   const [genreStats, setGenreStats] = useState({});
   const [artistStats, setArtistStats] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
-  const [newartistdata,setnewartistdata]=useState([])
-
+  const [newartistdata, setnewartistdata] = useState([]);
 
   useEffect(() => {
     fetchListeningStats();
@@ -34,16 +32,18 @@ const ListeningStats = ({ period }) => {
 
   useEffect(() => {
     if (stats.length > 0 && artistStats.length > 0) {
+        console.log("hello shit");
       fetchRecommendations();
     }
-  }, [stats, artistStats]);
+  }, [selectedTrack, stats, artistStats]);
 
   const fetchListeningStats = async () => {
+    console.log("fetching listening stats");
     try {
       const response = await axios.get(
         `http://localhost:3000/api/song/listening-stats/${email}?period=${period}`
       );
-      console.log(response.data)
+      console.log(response.data);
       setStats(response.data);
       calculateGenreStats(response.data);
       calculateArtistStats(response.data);
@@ -74,105 +74,118 @@ const ListeningStats = ({ period }) => {
         artists[stat.track.artist] = stat.count;
       }
     });
-console.log(artistStats)
+    console.log(artistStats);
     const sortedArtists = Object.entries(artists)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
     setArtistStats(sortedArtists);
   };
 
-  const fetchRecommendations = async () => {
-    console.log("fetching recommendation")
-    try {
-      setLoading(true);
-      const topTrack = stats[0]?.track;
-      const topArtists = artistStats.map(([artist]) => artist);
+//   const fetchRecommendations = async () => {
+//     console.log("fetching recommendation");
+//     try {
+//       setLoading(true);
 
-      if (topTrack && topArtists.length > 0) {
-        const artistResponses = await Promise.all(
-          topArtists.map((artist) =>
-            apiClient.get("search", {
-              params: {
-                q: artist,
-                type: "artist",
-                limit: 1,
-              },
-            })
-          )
-        );
+//       // Get the top track from listening stats
+//       const topTrack = stats[0]?.track;
 
-        console.log(artistResponses)
-       let newArtistStats = artistStats.map((artistStat) => {
-         const matchingResponse = artistResponses.find(
-           (response) => response.data.artists.items[0]?.name === artistStat[0]
-         );
+//       if (topTrack) {
+//         // Fetch recommendations from your custom API
+//         const response = await axios.get(
+//           `http://localhost:5000/recommendations?track_id=${topTrack.id}`,
+//           {method: "GET",
+//             headers: {
+//                 "Content-Type": "application/json",
+//             },
+//             credentials:"include",
+//           }
+        
+//         );
 
-         if (matchingResponse) {
-           const imageUrl =
-             matchingResponse.data.artists.items[0]?.images?.[2]?.url;
-           return [...artistStat, imageUrl];
-         }
+//         console.log(response.data);
 
-         return artistStat;
-       });
+//         // Map the response to match your existing data structure
+//         const newRecommendations = response.data.map((trackId) => {
+//           const track = stats.find((stat) => stat.track.id === trackId);
+//           return {
+//             _id: trackId,
+//             name: track?.track.name || "Unknown",
+//             artist: track?.track.artist || "Unknown",
+//             image: track?.track.image || "default_image_url",
+//             uri: track?.track.uri || "#",
+//             preview_url: track?.track.preview_url || null,
+//           };
+//         });
 
-       setnewartistdata(newArtistStats)
-       
-        const artistIds = artistResponses.slice(0,2)
-          .map((response) => response.data.artists.items[0]?.id)
-          .filter((id) => id);
-        console.log(artistIds)
+//         setRecommendations(newRecommendations);
+//         setSongsData(newRecommendations);
+//       }
+//     } catch (error) {
+//       console.error("Error fetching recommendations:", error);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
 
+const fetchRecommendations = async () => {
+  console.log("Fetching recommendations...");
+  try {
+    setLoading(true);
 
-        const response = await apiClient.get("recommendations", {
-          params: {
-            seed_tracks: topTrack.id,
-            seed_artists: artistIds.join(","),
-            limit: 10,
-          },
-        });
+    const topTrack = stats[0]?.track;
 
-        console.log(response)
-        const newRecommendations = response.data.tracks.map((track) => ({
-          _id: track.id,
-          name: track.name,
-          artist: track.artists[0].name,
-          image: track.album.images[0].url,
-          uri: track.uri,
-          preview_url:track.preview_url
-        }));
-        setRecommendations(newRecommendations);
-        setSongsData(newRecommendations);
-      }
-    } catch (error) {
-      console.error("Error fetching recommendations:", error);
-    } finally {
-      setLoading(false);
+    if (!topTrack) {
+      console.warn("No top track found.");
+      return;
     }
-  };
+
+    const response = await axios.get(
+      `http://localhost:5000/recommendations?track_id=${topTrack.id}`,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+    console.log("Recommended Track IDs:", response.data);
+
+    if (!Array.isArray(response.data)) {
+      console.error("Invalid response format:", response.data);
+      return;
+    }
+
+    const newRecommendations = response.data.map((trackId) => {
+      const trackData = stats.find((stat) => stat.track.id === trackId)?.track;
+
+      return {
+        _id: trackId,
+        name: trackData?.name || "Unknown Song",
+        artist: trackData?.artist || "Unknown Artist",
+        image: trackData?.image || "default_image_url",
+        uri: trackData?.uri || "#",
+        preview_url: trackData?.preview_url || null,
+      };
+    });
+    
+    console.log(newRecommendations);
+
+    setRecommendations(newRecommendations);
+    setSongsData(newRecommendations);
+  } catch (error) {
+    console.error("Error fetching recommendations:", error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const playRecommendation = (track, index) => {
     setSelectedTrack(track);
-    setSongsData(recommendations)
-    // setselectedTrackData(track);
+    setSongsData(recommendations);
     setTrack(track);
-
-    // if (embedController) {
-    //     console.log("playing side embed")
-    //   embedController.loadUri(track.uri);
-    //   embedController.addListener("playback_update", ({ data }) => {
-    //     if (data.position === data.duration) {
-    //       const nextIndex = (index + 1) % recommendations.length;
-    //       playRecommendation(recommendations[nextIndex], nextIndex);
-    //     }
-    //   });
-    // }
   };
 
-  useEffect(()=>
-  {
-    console.log(newartistdata)
-  },[newartistdata])
+  useEffect(() => {
+    console.log(newartistdata);
+  }, [newartistdata]);
 
   const chartData = {
     labels: Object.keys(genreStats),
@@ -202,15 +215,16 @@ console.log(artistStats)
     },
   };
 
-   if (loading) {
-     return (
-       <div className="grid place-items-center min-h-[80vh] bg-gray-900">
-         <div className="w-16 h-16 border-4 border-gray-600 border-t-green-500 rounded-full animate-spin"></div>
-       </div>
-     );
-   }
+  if (loading) {
+    return (
+      <div className="grid place-items-center min-h-[80vh] bg-gray-900">
+        <div className="w-16 h-16 border-4 border-gray-600 border-t-green-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className=" bg-gradient-to-b from-gray-900 to-black rounded-lg shadow-md p-6">
+    <div className="bg-gradient-to-b from-gray-900 to-black rounded-lg shadow-md p-6">
       <h2 className="text-2xl font-bold mb-6 text-gray-100">Listening Stats</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div>
@@ -242,11 +256,11 @@ console.log(artistStats)
             ))}
           </ul>
         </div>
-        <div className=" w-[100%] flex flex-col justify-center items-center">
+        <div className="w-[100%] flex flex-col justify-center items-center">
           <h3 className="text-xl font-semibold mb-4 text-gray-200">
             Favorite Artists
           </h3>
-          <ul className="space-y-4 w-[100%] flex flex-col items-center ">
+          <ul className="space-y-4 w-[100%] flex flex-col items-center">
             {newartistdata.map((item, index) => (
               <li
                 key={index}

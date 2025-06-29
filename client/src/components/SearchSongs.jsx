@@ -203,6 +203,40 @@ const SearchSongs = () => {
         createdAt: new Date().toISOString(),
       });
       console.log("Listening history recorded successfully");
+
+     console.log("📡 Sending request to Flask server...");
+console.log("🔹 user_id:", email);
+console.log("🔹 track_id:", track.id);
+
+await axios.post("http://localhost:5000/save-track", {
+    track_id: track.id,
+    track_name: track.name,
+    artist: track.artists ? track.artists[0].name : track.artist,
+    album: track.album?.name || "Unknown Album",
+    genre: track.genre || "Unknown",
+    image: track.image || track.album?.images[0]?.url || "",
+}, {
+    headers: { "Content-Type": "application/json" }
+})
+.then(response => {
+    console.log("✅ Listening history saved successfully:", response.data);
+})
+.catch(error => {
+    console.error("❌ Error recording listening history:", error);
+
+    if (error.response) {
+        console.error("🔴 Server responded with:", error.response.status, error.response.data);
+    } else if (error.request) {
+        console.error("🟡 No response received from server:", error.request);
+    } else {
+        console.error("🟠 Request setup error:", error.message);
+    }
+});
+
+      console.log(
+        "Listening history recorded successfully for user and global history"
+      );
+
     } catch (error) {
       console.error("Error recording listening history:", error);
     }

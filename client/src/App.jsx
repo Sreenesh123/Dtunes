@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Signup from "./components/Signup";
+import Party from "./components/Party.jsx";
 import Login from "./components/Login";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPassword from "./components/ResetPassword";
@@ -13,6 +14,7 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./custom-toast.css";
 import Notauthenticated from "./components/Notauthenticated.jsx";
+import AddPlaylist from "./components/AddPlaylist.jsx";
 
 
 export const url = "http://localhost:3000";
@@ -40,6 +42,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgotpassword" element={<ForgotPassword />} />
         <Route path="/resetPassword/:token" element={<ResetPassword />} />
+        <Route path="/add-playlist" element={<AddPlaylist />} />
       </Routes>
 
       {showSidebarAndPlayer && (

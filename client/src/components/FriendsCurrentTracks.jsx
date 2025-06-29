@@ -5,6 +5,7 @@ import axios from "axios";
 const FriendsCurrentTracks = ({ email }) => {
   const [friendsTracks, setFriendsTracks] = useState([]);
   const [newfriendsTracks, setnewFriendsTracks] = useState([]);
+  const token = localStorage.getItem("dauthtoken");
   
   console.log(email)
 
@@ -12,7 +13,10 @@ const FriendsCurrentTracks = ({ email }) => {
     const fetchFriendsTracks = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:3000/api/song/friendsCurrentTracks/${email}`
+          `http://localhost:3000/api/song/friendsCurrentTracks/${email}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
         );
         
         setFriendsTracks(response.data.friendsCurrentTracks);

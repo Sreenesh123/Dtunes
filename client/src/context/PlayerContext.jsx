@@ -2,6 +2,7 @@ import { createContext, useEffect, useRef, useState, useCallback } from "react";
 import axios from "axios";
 import { setClientToken } from "../spotify";
 import apiClient from "../spotify";
+import socketService from "../services/socketService";
 const url = "http://localhost:3000";
 
 export const PlayerContext = createContext();
@@ -30,42 +31,47 @@ const PlayerContextProvider = (props) => {
   const [spotifyIFrameAPI, setSpotifyIFrameAPI] = useState(null);
   const [spotifyToken, setSpotifyToken] = useState(null);
   const [isSpotifyTrack, setIsSpotifyTrack] = useState(false);
-  const [playlistimage,setPlaylistImage]=useState("")
+  const [playlistimage, setPlaylistImage] = useState("");
   const [playMode, setPlayMode] = useState("none");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [dauthtoken,setdauthtoken]=useState("")
+  const [dauthtoken, setdauthtoken] = useState("");
   const [time, setTime] = useState({
     currentTime: { second: 0, minute: 0 },
     totalTime: { second: 0, minute: 0 },
   });
+  const [isPartyMode, setIsPartyMode] = useState(false);
+  const [partyId, setPartyId] = useState(null);
+  const [partyStatus, setPartyStatus] = useState({
+    connected: false,
+    status: "Not connected",
+  });
+  const [partyMembers, setPartyMembers] = useState([]);
 
+  useEffect(() => {
+    console.log("PlayerContextProvider mounted");
+    return () => {
+      console.log("PlayerContextProvider unmounted");
+    };
+  }, []);
 
- useEffect(() => {
-   console.log("PlayerContextProvider mounted");
-   return () => {
-     console.log("PlayerContextProvider unmounted");
-   };
- }, []);
+  // handling verification of user using tokens...........................................................................................................................................
 
-
-// handling verification of user using tokens...........................................................................................................................................
-
-const api = axios.create({
-  baseURL: "http://localhost:3000",
-  withCredentials: true, 
-});
+  const api = axios.create({
+    baseURL: "http://localhost:3000",
+    withCredentials: true,
+  });
 
   const verifyUser = async () => {
     try {
-        console.log("entered verification")
-       const token = localStorage.getItem("dauthtoken");
-       const headers = {};
-       if (token) {
-         headers["Authorization"] = `Bearer ${token}`;
-       }
-       const response = await api.get("/auth/verify", { headers });
+      console.log("entered verification");
+      const token = localStorage.getItem("dauthtoken");
+      const headers = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const response = await api.get("/auth/verify", { headers });
       if (response.data.status) {
-        console.log("verification success")
+        console.log("verification success");
         const spotifyTokenResponse = await axios.get(
           "http://localhost:3000/auth/spotify/token"
         );
@@ -86,10 +92,8 @@ const api = axios.create({
   useEffect(() => {
     verifyUser();
   }, []);
-  
 
-
-//  handling play and pause functionalities of the player............................................................................................................................
+  //  handling play and pause functionalities of the player............................................................................................................................
 
   const play = async () => {
     try {
@@ -108,22 +112,22 @@ const api = axios.create({
     }
   };
 
-   const pause = async () => {
-     try {
-       if (embedController) {
-         console.log("entered embedpause");
-         await embedController.pause();
-       } else if (selectedTrackData && audioPlayer) {
-         console.log("entered audioplayerpause");
-         await audioPlayer.pause();
-       } else if (audioRef.current) {
-         await audioRef.current.pause();
-       }
-       setPlayStatus(false);
-     } catch (error) {
-       console.error("Error in pause:", error);
-     }
-   };
+  const pause = async () => {
+    try {
+      if (embedController) {
+        console.log("entered embedpause");
+        await embedController.pause();
+      } else if (selectedTrackData && audioPlayer) {
+        console.log("entered audioplayerpause");
+        await audioPlayer.pause();
+      } else if (audioRef.current) {
+        await audioRef.current.pause();
+      }
+      setPlayStatus(false);
+    } catch (error) {
+      console.error("Error in pause:", error);
+    }
+  };
 
   const stopAudioPlayer = () => {
     if (audioPlayer) {
@@ -135,20 +139,19 @@ const api = axios.create({
       audioRef.current.currentTime = 0;
     }
     if (embedController) {
-      embedController.pause()
+      embedController.pause();
       embedController.destroy();
     }
   };
 
-//  playing songs that dont contain uri.....................................................................................................
+  //  playing songs that dont contain uri.....................................................................................................
 
   const playWithId = async (id, tracks = null) => {
     try {
-      stopAudioPlayer()
-      if(embedController)   
-        {embedController.destroy(), 
-          setEmbedController(null);
-        } 
+      stopAudioPlayer();
+      if (embedController) {
+        embedController.destroy(), setEmbedController(null);
+      }
       const songsToUse = tracks || songsData;
       const track = Array.from(songsToUse).find((item) => item._id === id);
       if (track) {
@@ -184,7 +187,7 @@ const api = axios.create({
     }
   };
 
-// functionalities to play next and previous songs.......................................................................................................................................................
+  // functionalities to play next and previous songs.......................................................................................................................................................
 
   const next = async () => {
     let currentIndex = songsData.findIndex((item) => item._id === Track._id);
@@ -192,11 +195,12 @@ const api = axios.create({
       const nextTrack = songsData[currentIndex + 1];
       setTrack(nextTrack);
       setselectedTrackData(nextTrack);
-      if(playMode!=="dj"){
-      setSelectedTrack(nextTrack);}
+      if (playMode !== "dj") {
+        setSelectedTrack(nextTrack);
+      }
 
       if (embedController) {
-        console.log("playing with embed")
+        console.log("playing with embed");
         await embedController.loadUri(nextTrack.uri);
       } else if (audioPlayer) {
         audioPlayer.pause();
@@ -214,20 +218,16 @@ const api = axios.create({
         await audioRef.current.play();
       }
       setPlayStatus(true);
-    }
-    else{
-      currentIndex=0
-      if(playMode!=="dj"){
-setSelectedTrack(songsData[currentIndex]);
-      }
-      else{
+    } else {
+      currentIndex = 0;
+      if (playMode !== "dj") {
+        setSelectedTrack(songsData[currentIndex]);
+      } else {
         console.log("playing with id");
         playWithId(songsData[currentIndex]._id);
       }
-      
+
       setTrack(songsData[currentIndex]);
-      
-      
     }
   };
 
@@ -237,9 +237,9 @@ setSelectedTrack(songsData[currentIndex]);
       const previousTrack = songsData[currentIndex - 1];
       setTrack(previousTrack);
       setselectedTrackData(previousTrack);
-       if (playMode !== "dj") {
-         setSelectedTrack(previousTrack);
-       }
+      if (playMode !== "dj") {
+        setSelectedTrack(previousTrack);
+      }
       if (embedController) {
         await embedController.loadUri(previousTrack.uri);
       } else if (audioPlayer) {
@@ -262,8 +262,7 @@ setSelectedTrack(songsData[currentIndex]);
     }
   };
 
-
-// to play the song from the point where the seerkbar is clicked.......................................................................................................................
+  // to play the song from the point where the seerkbar is clicked.......................................................................................................................
 
   const seekSong = async (e) => {
     try {
@@ -309,7 +308,6 @@ setSelectedTrack(songsData[currentIndex]);
       console.error("Error seeking:", error);
     }
   };
-
 
   const updateSeekBar = useCallback(() => {
     if (seekBar.current) {
@@ -364,14 +362,11 @@ setSelectedTrack(songsData[currentIndex]);
     audioRef,
   ]);
 
+  const getAlbumsData = async () => {};
 
-  const getAlbumsData = async () => {
-  };
+  const getSongsData = async () => {};
 
-  const getSongsData = async () => {
-  };
-
-// functions used for playing the featured playlist from spotify.............................................................................................................................
+  // functions used for playing the featured playlist from spotify.............................................................................................................................
 
   const getPlaylistTracks = async (playlistId) => {
     try {
@@ -401,8 +396,7 @@ setSelectedTrack(songsData[currentIndex]);
     setPlayStatus(true);
   };
 
-// .................................................................................................................................................................
-
+  // .................................................................................................................................................................
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -422,7 +416,7 @@ setSelectedTrack(songsData[currentIndex]);
   }, []);
 
   useEffect(() => {
-    console.log(selectedTrack,spotifyIFrameAPI)
+    console.log(selectedTrack, spotifyIFrameAPI);
     if (selectedTrack && spotifyIFrameAPI) {
       initializeEmbedController();
     }
@@ -430,13 +424,12 @@ setSelectedTrack(songsData[currentIndex]);
 
   const initializeEmbedController = () => {
     const element = document.getElementById("embed-iframe");
-    console.log(element)
-    if(element==null && embedController)
-    {
-      embedController.loadUri(selectedTrack.uri)
+    console.log(element);
+    if (element == null && embedController) {
+      embedController.loadUri(selectedTrack.uri);
     }
     if (element && spotifyIFrameAPI) {
-      stopAudioPlayer()
+      stopAudioPlayer();
       if (embedController) {
         embedController.destroy();
       }
@@ -475,9 +468,8 @@ setSelectedTrack(songsData[currentIndex]);
       embedController.addListener("playback_update", (e) => {
         setCurrentPosition(e.data.position);
         setCurrentDuration(e.data.duration);
-        if(songsData.length>0 && e.data.position===e.data.duration)
-        {
-          next()
+        if (songsData.length > 0 && e.data.position === e.data.duration) {
+          next();
         }
       });
     } else {
@@ -498,12 +490,8 @@ setSelectedTrack(songsData[currentIndex]);
     updateSeekBar();
   }, [currentDuration, updateSeekBar]);
 
-//   useEffect(() => {
-//     getAlbumsData();
-//     getSongsData();
-//   }, []);
 
-  useEffect(() => {  
+  useEffect(() => {
     const handleEnded = () => {
       next();
     };
@@ -525,6 +513,105 @@ setSelectedTrack(songsData[currentIndex]);
     };
   }, [audioRef, audioPlayer, next]);
 
+  const joinParty = (partyId) => {
+    if (!email) return;
+
+    setPartyId(partyId);
+    setIsPartyMode(true);
+
+    socketService.connect();
+    socketService.joinParty(partyId, email);
+    socketService
+      .on("partyState", (state) => {
+        console.log("Received party state:", state);
+        setPartyStatus({ connected: true, status: "Connected" });
+        if (state.currentTrack) {
+          setTrack(state.currentTrack);
+          setselectedTrackData(state.currentTrack);
+
+          if (embedController) {
+            embedController.loadUri(state.currentTrack.uri);
+            setTimeout(() => {
+              embedController.seek(state.position);
+
+              if (state.isPlaying) {
+                embedController.play();
+                setPlayStatus(true);
+              } else {
+                embedController.pause();
+                setPlayStatus(false);
+              }
+            }, 1000);
+          }
+        }
+      })
+      .on("trackChange", (track) => {
+        console.log("Track changed:", track);
+        setTrack(track);
+        setselectedTrackData(track);
+
+        if (embedController && track.uri) {
+          embedController.loadUri(track.uri);
+          embedController.play();
+          setPlayStatus(true);
+        }
+      })
+      .on("playbackState", (state) => {
+        console.log("Playback state update:", state);
+
+        if (embedController) {
+          if (typeof state.position === "number") {
+            embedController.seek(state.position);
+          }
+
+          if (state.isPlaying && !playStatus) {
+            embedController.play();
+            setPlayStatus(true);
+          } else if (!state.isPlaying && playStatus) {
+            embedController.pause();
+            setPlayStatus(false);
+          }
+        }
+      })
+      .on("seekUpdate", (position) => {
+        console.log("Seek update:", position);
+        if (embedController) {
+          embedController.seek(position);
+        }
+      })
+      .on("error", (error) => {
+        console.error("Party socket error:", error);
+        setPartyStatus({ connected: false, status: "Error: " + error });
+      });
+  };
+
+  const leaveParty = () => {
+    if (socketService.isInParty()) {
+      socketService.leaveParty();
+    }
+
+    setIsPartyMode(false);
+    setPartyId(null);
+    setPartyStatus({ connected: false, status: "Not connected" });
+  };
+
+  const partyPlayPause = (isPlaying) => {
+    if (socketService.isInParty()) {
+      socketService.controlPlayback(isPlaying);
+    }
+  };
+
+  const partySeek = (position) => {
+    if (socketService.isInParty()) {
+      socketService.seekToPosition(position);
+    }
+  };
+
+  const partyPlayTrack = (track) => {
+    if (socketService.isInParty()) {
+      socketService.playTrack(track);
+    }
+  };
   const contextValue = {
     audioRef,
     seekBg,
@@ -565,7 +652,25 @@ setSelectedTrack(songsData[currentIndex]);
     setSelectedTrack,
     duration,
     setDuration,
-    playlistimage,setPlaylistImage,playMode,setPlayMode,isAuthenticated,setIsAuthenticated,loading,setLoading,verifyUser,spotifyToken
+    playlistimage,
+    setPlaylistImage,
+    playMode,
+    setPlayMode,
+    isAuthenticated,
+    setIsAuthenticated,
+    loading,
+    setLoading,
+    verifyUser,
+    spotifyToken,
+    joinParty,
+    leaveParty,
+    partyPlayPause,
+    partySeek,
+    partyPlayTrack,
+    isPartyMode,
+    partyId,
+    partyStatus,
+    partyMembers,
   };
 
   return (

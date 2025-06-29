@@ -169,10 +169,11 @@ const Player = () => {
   };
 
   const handleAddTrackToPlaylist = async (newtrackData) => {
+    console.log("roshan", newtrackData);
     const clickedtrackData = {
       id: newtrackData.id,
       name: newtrackData.name,
-      image: newtrackData.album.images[0],
+      image:newtrackData.album? newtrackData.album.images[0]:null,
       duration: newtrackData.duration_ms,
       preview_url: newtrackData.preview_url,
       uri: newtrackData.uri,
@@ -256,7 +257,7 @@ const Player = () => {
   return trackData ? (
     <div className="h-[10%]  bg-black flex justify-between items-center text-white px-4">
       <div className="hidden lg:flex items-center gap-4">
-        <img
+  2     <img
           className="w-12"
           src={
             trackData.image

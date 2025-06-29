@@ -101,10 +101,9 @@ router.post("/reset-password/:token", async (req, res) => {
   }
 });
 
-const verifyUser = async (req, res, next) => {
+export const verifyUser = async (req, res, next) => {
   console.log("entered verification");
   try {
-    // Check for token in cookies or Authorization header
     const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
     console.log("the token man is", token);
     if (!token) {
@@ -127,7 +126,7 @@ const verifyUser = async (req, res, next) => {
 };
 
 router.get("/verify", verifyUser, (req, res) => {
-    console.log("entered dauth verifi")
+  console.log("entered dauth verifi");
   return res.json({
     status: true,
     message: "authorized",
@@ -196,6 +195,8 @@ router.get("/spotify/search", async (req, res) => {
       .json({ error: "An error occurred while fetching data from Spotify" });
   }
 });
+
+// dauth login..........................................................................................................................................................
 
 router.get("/dauth-url", (req, res) => {
   const clientId = "nL5GDqobscCzFD01";
@@ -275,15 +276,20 @@ router.post("/dauth-login", async (req, res) => {
       expiresIn: "8h",
     });
     console.log("sreenesh", token);
-
-    // Still try to set the cookie (it might work in some cases)
-    res.cookie("token", token, { httpOnly: true, maxAge: 28800000 });
+    
+ res.cookie("token", token, {
+   httpOnly: true,
+   maxAge: 28800000,
+   path: "/",
+   domain: "localhost", 
+ });
+    console.log("Cookie set:", res.getHeaders()["set-cookie"]);
 
     return res.json({
       status: true,
       message: "Login successful",
       email: user.email,
-      token: token, // Send the token in the response body
+      token: token,
     });
   } catch (error) {
     console.error("DAuth login error:", error);
@@ -305,7 +311,6 @@ router.get("/user-details", async (req, res) => {
       }
     );
 
-
     const { email, id: dAuthId } = response.data;
 
     const dAuthLoginResponse = await axios.post(
@@ -321,7 +326,7 @@ router.get("/user-details", async (req, res) => {
         status: true,
         message: "Login successful",
         email: dAuthLoginResponse.data.email,
-        dauthtoken:dAuthLoginResponse.data.token
+        dauthtoken: dAuthLoginResponse.data.token,
       });
     } else {
       res.status(400).json({ status: false, message: "Login failed" });

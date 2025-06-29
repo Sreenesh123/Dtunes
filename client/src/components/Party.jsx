@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useContext } from "react";
 import { PlayerContext } from "../context/PlayerContext";
 import { setClientToken } from "../spotify";
 import { AudioPlayerContext } from "../context/AudioPlayerContext";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import socketService from "../services/socketService";
 
 const Party = () => {
   const {
@@ -16,14 +17,52 @@ const Party = () => {
     selectedTrack,
     setSelectedTrack,
     email,
+    time,
+    setTime,
+    playStatus,
+    play,
+    pause,
+    seekSong,
+    seekBg,
+    seekBar,
   } = useContext(PlayerContext);
-  
+
+  const navigate = useNavigate();
   const { partyId } = useParams();
   const [party, setParty] = useState({ playlists: [] });
   const [playlists, setPlaylists] = useState([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState("");
-  const [selectedPlaylist, setSelectedPlaylist] = useState(null);  
+  const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [isPartyCreator, setIsPartyCreator] = useState(false);
+  const [isPartyMode, setIsPartyMode] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("Not connected");
+  const [currentTrack, setCurrentTrack] = useState(null);
+  const lastPositionRef = useRef(0);
+
+  useEffect(() => {
+    if (email) {
+      socketService.connect();
+      socketService
+        .on("partyState", handlePartyState)
+        .on("trackChange", handleTrackChange)
+        .on("playbackState", handlePlaybackState)
+        .on("seekUpdate", handleSeekUpdate)
+        .on("syncResponse", handleSyncResponse)
+        .on("error", (errorMsg) => {
+          toast.error(errorMsg);
+        });
+
+      socketService.joinParty(partyId, email);
+      setIsPartyMode(true);
+      setSyncStatus("Connected");
+
+      return () => {
+        socketService.leaveParty();
+        setIsPartyMode(false);
+        setSyncStatus("Disconnected");
+      };
+    }
+  }, [email, partyId]);
 
   useEffect(() => {
     fetchParty();
@@ -39,6 +78,99 @@ const Party = () => {
       setIsPartyCreator(response.data.createdBy === email);
     } catch (error) {
       console.error("Error fetching party:", error);
+    }
+  };
+
+  const handlePartyState = (state) => {
+    console.log("Received initial party state:", state);
+
+    if (state.currentTrack) {
+      setCurrentTrack(state.currentTrack);
+      if (!isPartyCreator) {
+        setSelectedTrack(state.currentTrack);
+        setselectedTrackData(state.currentTrack);
+
+        if (embedController && state.currentTrack.uri) {
+          embedController.loadUri(state.currentTrack.uri);
+
+          setTimeout(() => {
+            embedController.seek(state.position);
+
+            if (state.isPlaying) {
+              embedController.play();
+              setPlayStatus(true);
+            } else {
+              embedController.pause();
+              setPlayStatus(false);
+            }
+          }, 1000);
+        }
+      }
+    }
+  };
+
+  const handleTrackChange = (track) => {
+    console.log("Track changed to:", track);
+    setCurrentTrack(track);
+
+    if (!isPartyCreator) {
+      setSelectedTrack(track);
+      setselectedTrackData(track);
+
+      if (embedController && track.uri) {
+        embedController.loadUri(track.uri);
+        embedController.play();
+        setPlayStatus(true);
+      }
+    }
+  };
+
+  const handlePlaybackState = (state) => {
+    console.log("Playback state update:", state);
+
+    if (!isPartyCreator && embedController) {
+      if (typeof state.position === "number") {
+        embedController.seek(state.position);
+        lastPositionRef.current = state.position;
+      }
+
+      if (state.isPlaying && !playStatus) {
+        embedController.play();
+        setPlayStatus(true);
+      } else if (!state.isPlaying && playStatus) {
+        embedController.pause();
+        setPlayStatus(false);
+      }
+    }
+  };
+
+  const handleSeekUpdate = (position) => {
+    console.log("Seek update to position:", position);
+
+    if (!isPartyCreator && embedController) {
+      embedController.seek(position);
+      lastPositionRef.current = position;
+    }
+  };
+
+  const handleSyncResponse = (state) => {
+    console.log("Sync response:", state);
+
+    if (!isPartyCreator && embedController) {
+      if (Math.abs(lastPositionRef.current - state.position) > 2) {
+        embedController.seek(state.position);
+        lastPositionRef.current = state.position;
+      }
+
+      if (state.isPlaying !== playStatus) {
+        if (state.isPlaying) {
+          embedController.play();
+          setPlayStatus(true);
+        } else {
+          embedController.pause();
+          setPlayStatus(false);
+        }
+      }
     }
   };
 
@@ -90,22 +222,26 @@ const Party = () => {
     } else {
       toast.error("Only the party creator can play tracks.");
     }
-  
   };
-
   const handlePlayTrack = () => {
     if (isPartyCreator) {
       if (selectedTrack) {
-          setselectedTrackData(selectedTrack);
-          if (embedController) {
-            embedController.loadUri(track.uri);
-            embedController.play();
-          } 
-        // setSelectedTrack(selectedTrack)
-        setPlayStatus(true);
+        setselectedTrackData(selectedTrack);
+        setCurrentTrack(selectedTrack);
+
+        if (embedController && selectedTrack.uri) {
+          embedController.loadUri(selectedTrack.uri);
+          embedController.play();
+          setPlayStatus(true);
+
+          socketService.playTrack(selectedTrack);
+        } else {
+          toast.warning(
+            "This track cannot be played in party mode (no URI found)"
+          );
+        }
       }
-    } 
-    else {
+    } else {
       toast.error("Only the party creator can play tracks.", {
         position: "top-right",
         autoClose: 3000,
@@ -117,17 +253,137 @@ const Party = () => {
     }
   };
 
+  const handlePartyPlayPause = () => {
+    if (embedController) {
+      const currentTimeInSeconds =
+        time.currentTime.minute * 60 + time.currentTime.second;
+
+      if (playStatus) {
+        embedController.pause();
+        setPlayStatus(false);
+        socketService.controlPlayback(false, currentTimeInSeconds);
+      } else {
+        embedController.play();
+        setPlayStatus(true); 
+        socketService.controlPlayback(true, currentTimeInSeconds);
+      }
+    }
+  };
+
+  const handlePartySeek = (e) => {
+    if (embedController && currentTrack && seekBg.current) {
+      const totalDurationInSeconds =
+        time.totalTime.minute * 60 + time.totalTime.second;
+
+      if (totalDurationInSeconds > 0) {
+        const newPositionInSeconds =
+          (e.nativeEvent.offsetX / seekBg.current.offsetWidth) *
+          totalDurationInSeconds;
+        seekSong(e);
+        socketService.seekToPosition(newPositionInSeconds);
+        lastPositionRef.current = newPositionInSeconds;
+      }
+    }
+  };
+
+  const handleLeaveParty = () => {
+    socketService.leaveParty();
+    setIsPartyMode(false);
+    navigate("/party");
+  };
   return (
     <div className="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen text-white p-8">
       <ToastContainer />
       {party ? (
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-5xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
-            {party.name}
-          </h2>
-          <p className="text-xl text-gray-300 mb-8">
-            Created by: {party.createdBy}
-          </p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-5xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+                {party.name}
+              </h2>
+              <p className="text-xl text-gray-300">
+                Created by: {party.createdBy}
+              </p>
+            </div>{" "}
+            <div className="flex flex-col items-end sm:flex-row sm:items-center">
+              <div className="flex items-center bg-gray-900 px-3 py-1 rounded-md mr-3 mb-2 sm:mb-0">
+                <span
+                  className={`h-3 w-3 rounded-full mr-2 ${
+                    syncStatus === "Connected"
+                      ? "animate-pulse bg-green-500"
+                      : "bg-red-500"
+                  }`}
+                ></span>
+                <span className="text-sm">{syncStatus}</span>
+              </div>
+              <button
+                onClick={handleLeaveParty}
+                className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md transition-colors"
+              >
+                Leave Party
+              </button>
+            </div>
+          </div>
+
+          {currentTrack && (
+            <div className="bg-gray-800 rounded-xl p-6 shadow-lg mt-6 mb-8">
+              <div className="flex flex-col md:flex-row items-center mb-4">
+                {currentTrack.album &&
+                currentTrack.album.images &&
+                currentTrack.album.images[0] ? (
+                  <img
+                    src={currentTrack.album.images[0].url}
+                    alt={currentTrack.name}
+                    className="w-32 h-32 object-cover rounded-lg shadow-lg mr-6"
+                  />
+                ) : (
+                  <div className="w-32 h-32 bg-gray-700 rounded-lg shadow-lg mr-6 flex items-center justify-center">
+                    <span>No Image</span>
+                  </div>
+                )}
+                <div>
+                  <h3 className="text-2xl font-bold">{currentTrack.name}</h3>
+                  <p className="text-gray-400">
+                    {currentTrack.artist ||
+                      (currentTrack.artists && currentTrack.artists[0].name)}
+                  </p>
+                  <div className="mt-3 flex items-center">
+                    <button
+                      onClick={handlePartyPlayPause}
+                      className="bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 text-white py-2 px-6 rounded-full"
+                    >
+                      {playStatus ? "Pause" : "Play"}
+                    </button>
+                    <div className="ml-4 text-sm">
+                      <span>
+                        {time.currentTime.minute}:
+                        {time.currentTime.second < 10 ? "0" : ""}
+                        {time.currentTime.second}
+                      </span>
+                      <span> / </span>
+                      <span>
+                        {time.totalTime.minute}:
+                        {time.totalTime.second < 10 ? "0" : ""}
+                        {time.totalTime.second}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="relative h-4 bg-gray-700 rounded-full cursor-pointer"
+                onClick={handlePartySeek}
+                ref={seekBg}
+              >
+                <div
+                  className="absolute h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
+                  ref={seekBar}
+                ></div>
+              </div>
+            </div>
+          )}
+
           {party.participants && party.participants.includes(email) ? (
             <div className="space-y-12">
               <div className="bg-gray-800 rounded-xl p-6 shadow-lg">

@@ -53,6 +53,7 @@ const Sidebar = () => {
           <NavItem to="/list-artist" icon={FaMusic} text="Artists" />
           <NavItem to="/listening-stats" icon={FaChartBar} text="Insights" />
           <NavItem to="/party" icon={FaUsers} text="Social" />
+          
         </nav>
       </div>
 
